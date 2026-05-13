@@ -1,0 +1,13 @@
+numpy
+pytest
+jax-metal==0.1.1
+jaxlib==0.4.34
+jax==0.4.34
+flax
+optax
+jaxmarl
+chex
+gymnax
+distrax
+matplotlib
+scipy
