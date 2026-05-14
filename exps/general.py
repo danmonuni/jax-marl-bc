@@ -105,8 +105,11 @@ def run_general_experiment(name="hetero_rbc", n_grid=N_GRID):
     for i, kv in enumerate(kappa_spreads):
         kappas, lambdas = _build_arrays(kv, lambda_vals)
         env      = _make_env(kappas, lambdas)
+        t0 = time.perf_counter()    
         train_fn = make_train(env, CONFIG)
         out      = train_fn(jax.random.PRNGKey(42 + i * 100))
+        t1 = time.perf_counter()
+        print(f"training time: {(t1 - t0)/60:.4f} mins")
 
         rec = simulate(env, net, out["params"], jax.random.PRNGKey(i), n_steps=2000)
         results.append((kappas, lambdas, rec, out["metrics"]))
@@ -199,7 +202,5 @@ def _plot_figure5(results, spread_labels, n_grid, name):
 
 
 if __name__ == "__main__":
-    t0 = time.perf_counter()
     run_general_experiment()
-    t1 = time.perf_counter()
-    print(f"rbc_textbook execution time: {(t1 - t0)/60:.4f} mins")
+    

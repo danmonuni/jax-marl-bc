@@ -39,40 +39,51 @@ def mpc_curve(w, cf, n_bins=40):
             cy.append(np.nan)
     return cx, np.array(cy)
 
-def simulate(env, net, params, key, n_steps=2000):
-    """Deterministic (mean-action) rollout for diagnostics."""
+def _simulate_jax(env, net, params, key, n_steps=2000):
+    """Pure-JAX deterministic rollout returning JAX arrays (composable with vmap)."""
     obs, state = env.reset(key)
-    rec = dict(ks=[], wealths=[], c_fracs=[], K=[], ls=[], reward=[], emp_states=[], agg_state=[])
 
-    for _ in range(n_steps):
+    def _step(carry, _):
+        obs, state, key = carry
         obs_mat = jnp.stack([obs[a] for a in env.agents])
         pi, _ = net.apply(params, obs_mat)
-        mu = pi.loc  # deterministic mean action
+        mu = pi.loc  # [n_agents, act_dim]
 
-        acts_dict = {a: mu[i] for i, a in enumerate(env.agents)}
-
+        acts = {a: mu[i] for i, a in enumerate(env.agents)}
         key, sk = jax.random.split(key)
-        obs, state, rews, dones, _ = env.step(sk, state, acts_dict)
+        # env.step handles auto-reset internally via lax.select — no Python branch needed
+        obs, state, rews, dones, _ = env.step(sk, state, acts)
 
-        rec["ks"].append(np.array(state.ks))
-        rec["wealths"].append(np.array(state.wealths))
-        rec["c_fracs"].append(np.array((mu[:, 0] + 1) / 2))
-        rec["ls"].append(np.array((mu[:, 1] + 1) / 2) if mu.shape[1] > 1 else np.array(state.ls))
-        rec["K"].append(float(jnp.mean(state.ks)))
-        rec["reward"].append(float(np.mean([rews[a] for a in env.agents])))
-        rec["emp_states"].append(
-            np.array(state.emp_states) if hasattr(state, "emp_states")
-            else np.ones(len(env.agents), dtype=int)
-        )
-        rec["agg_state"].append(
-            int(state.agg_state) if hasattr(state, "agg_state") else 1
-        )
+        rew_arr = jnp.stack([rews[a] for a in env.agents])
+        record = {
+            "ks":        state.ks,
+            "wealths":   state.wealths,
+            "c_fracs":   (mu[:, 0] + 1) / 2,
+            "ls":        (mu[:, 1] + 1) / 2 if mu.shape[1] > 1 else state.ls,
+            "K":         jnp.mean(state.ks),
+            "reward":    jnp.mean(rew_arr),
+            "emp_states": getattr(state, "emp_states", jnp.ones(env.num_agents, jnp.int32)),
+            "agg_state":  getattr(state, "agg_state",  jnp.array(1, jnp.int32)),
+        }
+        return (obs, state, key), record
 
-        if bool(dones["__all__"]):
-            key, sk = jax.random.split(key)
-            obs, state = env.reset(sk)
+    _, rec = jax.lax.scan(_step, (obs, state, key), None, length=n_steps)
+    return rec
 
-    return {k: np.array(v) for k, v in rec.items()}
+
+def simulate(env, net, params, key, n_steps=2000):
+    """Deterministic (mean-action) rollout compiled with lax.scan."""
+    return jax.tree.map(np.array, _simulate_jax(env, net, params, key, n_steps))
+
+
+def simulate_seeds(env, net, params, keys, n_steps=2000):
+    """Run simulate over multiple seeds in parallel with vmap.
+
+    keys: Array of shape [n_seeds, 2] (stack of PRNGKeys).
+    Returns rec with a leading n_seeds dimension on every array.
+    """
+    rec = jax.vmap(lambda k: _simulate_jax(env, net, params, k, n_steps))(keys)
+    return jax.tree.map(np.array, rec)
 
 def save_results(metrics, rec, folder, name):
     os.makedirs(folder, exist_ok=True)

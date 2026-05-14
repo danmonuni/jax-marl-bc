@@ -60,8 +60,11 @@ def run_ks_experiment(n_agents=20, name="ks_limit"):
         "ACTIVATION": "tanh",
     }
 
+    t0 = time.perf_counter()
     train_fn = make_train(env, config)
     out = train_fn(jax.random.PRNGKey(123))
+    t1 = time.perf_counter()
+    print(f"training time: {(t1 - t0)/60:.4f} mins")
 
     metrics       = out["metrics"]
     params_final  = out["params"]
@@ -162,8 +165,6 @@ def run_ks_experiment(n_agents=20, name="ks_limit"):
 
 
 if __name__ == "__main__":
-    t0 = time.perf_counter()
     run_ks_experiment()
-    t1 = time.perf_counter()
-    print(f"rbc_textbook execution time: {(t1 - t0)/60:.4f} mins")
+    
     

@@ -49,8 +49,12 @@ def run_rbc_experiment(delta, name, c_target, l_target):
         "ACTIVATION": "tanh",
     }
 
+    t0 = time.perf_counter()
     train_fn = make_train(env, config)
     out = train_fn(jax.random.PRNGKey(42))
+    t1 = time.perf_counter()
+    print(f"rbc_textbook execution time: {(t1 - t0)/60:.4f} mins")
+
     metrics = out["metrics"]
 
     save_results(metrics, {}, "results/rbc", name)
@@ -95,10 +99,6 @@ if __name__ == "__main__":
     l_star_1 = ALPHA / (B * (1 - (1 - ALPHA) * BETA) + ALPHA)
     print(f"Analytical targets (delta=1.0): c*={c_star_1:.4f}, l*={l_star_1:.4f}")
 
-    t0 = time.perf_counter()
     run_rbc_experiment(delta=1.0,   name="rbc_textbook", c_target=c_star_1, l_target=l_star_1)
-    t1 = time.perf_counter()
-    print(f"rbc_textbook execution time: {(t1 - t0)/60:.4f} mins")
     run_rbc_experiment(delta=0.025, name="rbc_typical",  c_target=0.1611,   l_target=0.1222)
-    t2 = time.perf_counter()
-    print(f"rbc_typical execution time: {(t2 - t1)/60:.4f} mins")
+    
