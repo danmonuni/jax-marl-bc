@@ -1,5 +1,5 @@
 import os
-#os.environ["JAX_PLATFORM_NAME"] = "cpu"
+os.environ["JAX_PLATFORM_NAME"] = "cpu"
 
 import jax
 import numpy as np
@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 from envs.env_std import RBCKLEnv
 from algos.make_train import make_train
 from exps.utils import save_results
+
+import time
 
 ALPHA = 0.36
 BETA  = 0.95
@@ -28,17 +30,17 @@ def run_rbc_experiment(delta, name, c_target, l_target):
         sigma=0.01,
         max_steps=1000,
         k_init=1,
-        obs_vars=("capital","mean_capital","labour","mean_labour","TFP","kappa","lambda"),
+        obs_vars=("capital",),
     )
 
     config = {
-        "NUM_ENVS": 50,
-        "ROLLOUT_LEN": 100,
-        "TOTAL_TIMESTEPS": 10_000_000,
-        "UPDATE_EPOCHS": 100,
+        "NUM_ENVS": 20,
+        "ROLLOUT_LEN": 200,
+        "TOTAL_TIMESTEPS": 1_000_000,
+        "UPDATE_EPOCHS": 10,
         "NUM_MINIBATCHES": 10,
         "LR": 3e-4,
-        "GAMMA": 0.99,
+        "GAMMA": 0.95,
         "GAE_LAMBDA": 0.95,
         "CLIP_EPS": 0.2,
         "VF_COEF": 0.5,
@@ -93,5 +95,10 @@ if __name__ == "__main__":
     l_star_1 = ALPHA / (B * (1 - (1 - ALPHA) * BETA) + ALPHA)
     print(f"Analytical targets (delta=1.0): c*={c_star_1:.4f}, l*={l_star_1:.4f}")
 
+    t0 = time.perf_counter()
     run_rbc_experiment(delta=1.0,   name="rbc_textbook", c_target=c_star_1, l_target=l_star_1)
+    t1 = time.perf_counter()
+    print(f"rbc_textbook execution time: {(t1 - t0)/60:.4f} mins")
     run_rbc_experiment(delta=0.025, name="rbc_typical",  c_target=0.1611,   l_target=0.1222)
+    t2 = time.perf_counter()
+    print(f"rbc_typical execution time: {(t2 - t1)/60:.4f} mins")

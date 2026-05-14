@@ -1,5 +1,5 @@
 import os
-#os.environ["JAX_PLATFORM_NAME"] = "cpu"
+os.environ["JAX_PLATFORM_NAME"] = "cpu"
 
 import jax
 import numpy as np
@@ -11,6 +11,8 @@ from envs.env_ksmf import RBCKSEnv
 from algos.nn import ActorCritic
 from algos.make_train import make_train
 from exps.utils import simulate, save_results, gini
+
+import time
 
 ALPHA = 0.36
 BETA  = 0.95
@@ -39,21 +41,21 @@ def run_ks_experiment(n_agents=20, name="ks_limit"):
         beta=BETA,
         max_steps=500,
         k_init=1,
-        obs_vars=("capital","mean_capital","labour","mean_labour","TFP","kappa","lambda"),
+        obs_vars=("capital","mean_capital","aggregate_state","kappa","lambda"),
     )
 
     config = {
-        "NUM_ENVS": 80,
-        "ROLLOUT_LEN": 500,
+        "NUM_ENVS": 20,
+        "ROLLOUT_LEN": 200,
         "TOTAL_TIMESTEPS": 10_000_000,
         "UPDATE_EPOCHS": 10,
-        "NUM_MINIBATCHES": 10,
+        "NUM_MINIBATCHES": 20,
         "LR": 3e-4,
-        "GAMMA": 0.99,
+        "GAMMA": 0.95,
         "GAE_LAMBDA": 0.95,
         "CLIP_EPS": 0.2,
         "VF_COEF": 0.5,
-        "ENT_COEF": 0.01,
+        "ENT_COEF": 0.00,
         "HIDDEN_DIMS": (64, 64),
         "ACTIVATION": "tanh",
     }
@@ -126,7 +128,7 @@ def run_ks_experiment(n_agents=20, name="ks_limit"):
         ax.hist(k_vals, bins=40, density=True, color="steelblue", alpha=0.75)
         ax.set_title(f"{label}  (Gini={g:.3f})", fontsize=9)
         ax.set_xlabel("Capital $k^i$", fontsize=8)
-        ax.set_ylabel("Density",        fontsize=8)
+        ax.set_ylabel("Density", fontsize=8)
         ax.tick_params(labelsize=7)
 
     # ---- Right: MPC scatter before / after, coloured by employment
@@ -160,4 +162,8 @@ def run_ks_experiment(n_agents=20, name="ks_limit"):
 
 
 if __name__ == "__main__":
+    t0 = time.perf_counter()
     run_ks_experiment()
+    t1 = time.perf_counter()
+    print(f"rbc_textbook execution time: {(t1 - t0)/60:.4f} mins")
+    
