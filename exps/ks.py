@@ -2,6 +2,7 @@ import os
 os.environ["JAX_PLATFORM_NAME"] = "cpu"
 
 import jax
+print(f"JAX running on platform: {jax.default_backend()} ({jax.devices()})")
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
