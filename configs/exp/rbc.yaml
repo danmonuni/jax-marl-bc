@@ -1,0 +1,20 @@
+# Real Business Cycle (single-agent, endogenous labour). The driver runs two
+# variants: "textbook" (delta=1.0, closed-form solution) and "typical"
+# (delta=0.025). delta below is the typical default; the driver overrides it.
+exp: rbc
+
+env:
+  kind: rbc
+  n_agents: 1
+  delta: 0.025
+  b: 5.0
+  rho: 0.9
+  sigma: 0.01
+  max_steps: 1000
+  k_init: 1.0
+  obs_vars: [capital]
+
+train:
+  total_timesteps: 1000000
+  num_minibatches: 10
+  ent_coef: 0.01

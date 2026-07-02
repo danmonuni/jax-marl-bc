@@ -6,10 +6,9 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 
-from envs.env_ksmf import RBCKSEnv
-from envs.env_std import RBCKLEnv
-from algos.nn import ActorCritic
-from exps.utils import simulate, simulate_seeds
+from jmbc.envs import RBCKSEnv, RBCKLEnv
+from jmbc.algos import ActorCritic
+from jmbc.diagnostics import simulate, simulate_seeds
 
 N_AGENTS = 4
 N_STEPS  = 120   # covers >2 episodes (max_steps=50)

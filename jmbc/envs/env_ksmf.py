@@ -1,16 +1,9 @@
-import os
-os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
-
 import jax, jax.numpy as jnp, numpy as np
 from jax import lax, vmap
 from flax import struct
-import flax.linen as nn
-import optax, chex
-from typing import NamedTuple, Dict
+import chex
+from typing import Dict
 from functools import partial
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-import distrax
 
 # JaxMARL imports
 from jaxmarl.environments.multi_agent_env import MultiAgentEnv, State
@@ -51,12 +44,23 @@ def build_ks_P():
 
 KS_P = build_ks_P()
 
-# Verify stationary distribution
-_v, _e = np.linalg.eig(np.array(KS_P).T)
-_s = np.abs(_e[:, np.argmax(_v.real)]); _s /= _s.sum()
-print(f"Stationary: BU={_s[0]:.3f} BE={_s[1]:.3f} GU={_s[2]:.3f} GE={_s[3]:.3f}")
-print(f"u_bad={_s[0]/(_s[0]+_s[1]):.3f} (target 0.10)"
-      f" u_good={_s[2]/(_s[2]+_s[3]):.3f} (target 0.04)")
+
+def ks_stationary_distribution(P=None):
+    """Stationary distribution over (Bad/Good x Unemp/Emp) for verification.
+
+    Returns dict with the four masses and the implied unemployment rates.
+    Calibration target: u_bad=0.10, u_good=0.04.
+    """
+    P = KS_P if P is None else P
+    v, e = np.linalg.eig(np.array(P).T)
+    s = np.abs(e[:, np.argmax(v.real)])
+    s /= s.sum()
+    return {
+        "BU": float(s[0]), "BE": float(s[1]),
+        "GU": float(s[2]), "GE": float(s[3]),
+        "u_bad": float(s[0] / (s[0] + s[1])),
+        "u_good": float(s[2] / (s[2] + s[3])),
+    }
 
 @struct.dataclass
 class RBCKSState(State):

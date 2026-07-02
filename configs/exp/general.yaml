@@ -1,0 +1,19 @@
+# Heterogeneous RBC over an n_grid x n_grid grid of (kappa, lambda) agents.
+# The driver runs three kappa-spread scenarios (homogeneous / moderate / wide).
+exp: general
+
+env:
+  kind: rbc
+  n_grid: 3
+  delta: 0.025
+  b: 5.0
+  rho: 0.9
+  sigma: 0.01
+  max_steps: 500
+  k_init: 0.1
+  obs_vars: [capital, mean_capital, labour, mean_labour, TFP, kappa, lambda]
+
+train:
+  total_timesteps: 1000000
+  num_minibatches: 40
+  ent_coef: 0.0

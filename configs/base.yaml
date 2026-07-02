@@ -1,0 +1,36 @@
+# Shared defaults for every experiment. Experiment files in exp/ override these,
+# and CLI dotlist overrides (env.n_agents=1000) override everything.
+
+env:
+  alpha: 0.36
+  beta: 0.95
+
+train:
+  num_envs: 20
+  rollout_len: 200
+  update_epochs: 10
+  lr: 3.0e-4
+  gamma: 0.95
+  gae_lambda: 0.95
+  clip_eps: 0.2
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  anneal_lr: false
+
+net:
+  hidden_dims: [64, 64]
+  activation: tanh
+
+diag:
+  n_snapshots: 4
+  sim_steps: 2000
+  economic: true
+  distributional: true
+  burn_frac: 0.5
+
+log:
+  out_dir: results
+
+run:
+  seed: 0
+  device: auto

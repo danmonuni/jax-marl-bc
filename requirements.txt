@@ -1,9 +1,10 @@
+# Colab / CUDA-12 GPU install. For local CPU dev use: pip install -e .
+# jax 0.4.34 + flax 0.8.5 must stay pinned together (newer jax breaks flax 0.8.x,
+# newer flax requires newer jax; jaxmarl/distrax resolve around this pin).
 numpy
 pytest
-jax-metal==0.1.1
-jaxlib==0.4.34
-jax==0.4.34
-flax
+jax[cuda12]==0.4.34
+flax==0.8.5
 optax
 jaxmarl
 chex
@@ -11,3 +12,5 @@ gymnax
 distrax
 matplotlib
 scipy
+omegaconf
+pandas

@@ -1,16 +1,9 @@
-import os
-os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
-
 import jax, jax.numpy as jnp, numpy as np
 from jax import lax, vmap
 from flax import struct
-import flax.linen as nn
-import optax, chex
-from typing import NamedTuple, Dict
+import chex
+from typing import Dict
 from functools import partial
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-import distrax
 
 # JaxMARL imports
 from jaxmarl.environments.multi_agent_env import MultiAgentEnv, State

@@ -46,3 +46,6 @@ paper.pdf
 
 results
 results/
+benchmarks/
+.sources/
+.ipynb_checkpoints/

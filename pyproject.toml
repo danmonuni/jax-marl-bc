@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jmbc"
+version = "0.1.0"
+description = "JaxMARL-BC: multi-agent RL for macroeconomic models (RBC, Krusell-Smith)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "jax",
+    "jaxlib",
+    "flax",
+    "optax",
+    "distrax",
+    "chex",
+    "jaxmarl",
+    "gymnax",
+    "omegaconf",
+    "pandas",
+    "matplotlib",
+    "scipy",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+jmbc-run = "jmbc.run:main"
+jmbc-sweep = "jmbc.sweep:main"
+
+[tool.setuptools.packages.find]
+include = ["jmbc*"]
+
+[tool.setuptools.package-data]
+jmbc = ["../configs/**/*.yaml"]

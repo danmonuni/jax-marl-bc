@@ -1,0 +1,18 @@
+# Headline scaling sweep: how throughput/wall-time scale with the number of
+# agents and parallel environments. Fixed, short budget per cell for a clean
+# comparison. Run:  python -m jmbc.sweep sweep=scaling
+name: scaling
+base_exp: rbc
+
+axes:
+  env.n_agents: [1, 10, 100, 1000]
+  train.num_envs: [8, 32, 128]
+
+overrides:
+  train.total_timesteps: 400000
+  diag.economic: false
+  diag.distributional: false
+  run.device: auto
+
+repeats: 1
+collect_diagnostics: false

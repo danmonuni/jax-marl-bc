@@ -1,0 +1,15 @@
+# Krusell-Smith (exogenous labour via a 4-state employment Markov chain).
+exp: ks
+
+env:
+  kind: ks
+  n_agents: 20
+  delta: 0.025
+  max_steps: 500
+  k_init: 1.0
+  obs_vars: [capital, mean_capital, aggregate_state, kappa, lambda]
+
+train:
+  total_timesteps: 10000000
+  num_minibatches: 20
+  ent_coef: 0.0

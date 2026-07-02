@@ -1,13 +1,23 @@
+"""PPO training loop (JaxMARL-compatible), with rich in-loop diagnostics.
+
+Training dynamics are unchanged from the original implementation: the extra
+metrics (approx-KL, clip fraction, explained variance, grad norm, action
+saturation, per-component losses) are read-only quantities computed from values
+already present in the loop, so a fixed seed reproduces the original policy.
+
+``make_train`` copies the incoming config so derived keys (NUM_ACTORS, ...) do
+not leak back into the caller — important for sweeps that reuse a base config.
+"""
 import jax
 import jax.numpy as jnp
 import optax
 from flax.training.train_state import TrainState
 from typing import NamedTuple, Dict, Any
-from functools import partial
 
 from jaxmarl.environments.multi_agent_env import MultiAgentEnv
 from jaxmarl.wrappers.baselines import LogWrapper
-from algos.nn import ActorCritic
+from .nn import ActorCritic
+
 
 class Transition(NamedTuple):
     done: jnp.ndarray
@@ -18,19 +28,21 @@ class Transition(NamedTuple):
     obs: jnp.ndarray
     info: Dict[str, Any]
 
+
 def batchify(x: dict, agent_list, num_envs, num_agents):
     """Stack agent observations/rewards/dones into [num_envs, num_agents, ...]."""
-    x = jnp.stack([x[a] for a in agent_list], axis=1) # [num_envs, num_agents, ...]
+    x = jnp.stack([x[a] for a in agent_list], axis=1)  # [num_envs, num_agents, ...]
     return x
 
+
 def unbatchify(x: jnp.ndarray, agent_list, num_envs, num_agents):
-    """Split batched actions [num_envs, num_agents, AD] back into a dictionary per agent."""
+    """Split batched actions [num_envs, num_agents, AD] back into a per-agent dict."""
     return {a: x[:, i] for i, a in enumerate(agent_list)}
 
+
 def make_train(env: MultiAgentEnv, config: dict):
-    """
-    Returns a train function. Network init happens eagerly (outside JIT) to avoid the core training loop is JIT-compiled internally.
-    """
+    """Return a train function. Network init happens eagerly (outside JIT)."""
+    config = dict(config)  # defensive copy: do not mutate the caller's dict
     config["NUM_ACTORS"] = env.num_agents * config["NUM_ENVS"]
     config["NUM_UPDATES"] = (
         config["TOTAL_TIMESTEPS"] // config["ROLLOUT_LEN"] // config["NUM_ENVS"]
@@ -41,12 +53,11 @@ def make_train(env: MultiAgentEnv, config: dict):
 
     env = LogWrapper(env)
 
-    # Build network and dummy input outside of train so init runs eagerly (not inside JIT).
     act_dim = env.action_space(env.agents[0]).shape[0]
     network = ActorCritic(
         action_dim=act_dim,
         activation=config.get("ACTIVATION", "tanh"),
-        hidden_dims=config.get("HIDDEN_DIMS", (64, 64))
+        hidden_dims=config.get("HIDDEN_DIMS", (64, 64)),
     )
     init_x = jnp.zeros(env.observation_space(env.agents[0]).shape)
 
@@ -56,9 +67,7 @@ def make_train(env: MultiAgentEnv, config: dict):
 
     @jax.jit
     def _train_core(rng, network_params):
-        """JIT-compiled training loop. Receives pre-initialised params."""
-
-        # 1. BUILD OPTIMIZER & TRAIN STATE
+        # 1. OPTIMIZER & TRAIN STATE
         if config.get("ANNEAL_LR", False):
             tx = optax.chain(
                 optax.clip_by_global_norm(config.get("MAX_GRAD_NORM", 0.5)),
@@ -67,13 +76,11 @@ def make_train(env: MultiAgentEnv, config: dict):
         else:
             tx = optax.chain(
                 optax.clip_by_global_norm(config.get("MAX_GRAD_NORM", 0.5)),
-                optax.adam(config["LR"], eps=1e-5)
+                optax.adam(config["LR"], eps=1e-5),
             )
 
         train_state = TrainState.create(
-            apply_fn=network.apply,
-            params=network_params,
-            tx=tx,
+            apply_fn=network.apply, params=network_params, tx=tx,
         )
 
         # 2. INIT ENV
@@ -89,22 +96,17 @@ def make_train(env: MultiAgentEnv, config: dict):
             def _env_step(carry, _):
                 train_state, env_state, last_obs, rng = carry
 
-                # {agent: [NE, OD]} -> [NE, N, OD]
                 obs_batch = batchify(last_obs, env.agents, config["NUM_ENVS"], env.num_agents)
-                # [NE, N, OD] -> [NE*N, OD]
                 obs_flat = obs_batch.reshape((config["NUM_ACTORS"], -1))
 
-                # Select actions
                 rng, _rng = jax.random.split(rng)
                 pi, value = network.apply(train_state.params, obs_flat)
                 action = pi.sample(seed=_rng)
                 log_prob = pi.log_prob(action)
 
-                # [NE*N, AD] -> [NE, N, AD] -> {agent: [NE, AD]}
                 action_reshaped = action.reshape((config["NUM_ENVS"], env.num_agents, -1))
                 env_act = unbatchify(action_reshaped, env.agents, config["NUM_ENVS"], env.num_agents)
 
-                # Step environment
                 rng, _rng = jax.random.split(rng)
                 rng_step = jax.random.split(_rng, config["NUM_ENVS"])
                 obsv, env_state, reward, done, info = jax.vmap(env.step)(
@@ -126,7 +128,7 @@ def make_train(env: MultiAgentEnv, config: dict):
                 _env_step, (train_state, env_state, last_obs, rng), None, config["ROLLOUT_LEN"]
             )
 
-            # 3.2 CALCULATE ADVANTAGE (GAE)
+            # 3.2 ADVANTAGE (GAE)
             train_state, env_state, last_obs, rng = runner_state
             last_obs_batch = batchify(last_obs, env.agents, config["NUM_ENVS"], env.num_agents)
             last_obs_flat = last_obs_batch.reshape((config["NUM_ACTORS"], -1))
@@ -151,6 +153,12 @@ def make_train(env: MultiAgentEnv, config: dict):
 
             advantages, targets = _calculate_gae(traj_batch, last_val_reshaped)
 
+            # Explained variance of the value function (computed once per update).
+            y_true = targets.reshape(-1)
+            y_pred = traj_batch.value.reshape(-1)
+            var_y = jnp.var(y_true)
+            explained_var = 1.0 - jnp.var(y_true - y_pred) / (var_y + 1e-8)
+
             # 3.3 UPDATE NETWORK (EPOCHS & MINIBATCHES)
             def _update_epoch(update_state, _):
                 def _update_minibatch(train_state, batch_info):
@@ -160,7 +168,6 @@ def make_train(env: MultiAgentEnv, config: dict):
                         pi, value = network.apply(params, traj_batch.obs)
                         log_prob = pi.log_prob(traj_batch.action)
 
-                        # Value loss (clipped)
                         value_pred_clipped = traj_batch.value + (
                             value - traj_batch.value
                         ).clip(-config["CLIP_EPS"], config["CLIP_EPS"])
@@ -168,7 +175,6 @@ def make_train(env: MultiAgentEnv, config: dict):
                         value_losses_clipped = jnp.square(value_pred_clipped - targets)
                         value_loss = 0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
 
-                        # Actor loss (clipped)
                         ratio = jnp.exp(log_prob - traj_batch.log_prob)
                         gae = (gae - gae.mean()) / (gae.std() + 1e-8)
                         loss_actor1 = ratio * gae
@@ -177,37 +183,52 @@ def make_train(env: MultiAgentEnv, config: dict):
 
                         entropy = pi.entropy().mean()
 
+                        # Read-only PPO health diagnostics.
+                        approx_kl = jnp.mean((ratio - 1.0) - jnp.log(ratio))
+                        clip_frac = jnp.mean((jnp.abs(ratio - 1.0) > config["CLIP_EPS"]).astype(jnp.float32))
+
                         total_loss = (
                             loss_actor
                             + config["VF_COEF"] * value_loss
                             - config["ENT_COEF"] * entropy
                         )
-                        return total_loss, (value_loss, loss_actor, entropy)
+                        aux = (value_loss, loss_actor, entropy, approx_kl, clip_frac)
+                        return total_loss, aux
 
                     grad_fn = jax.value_and_grad(_loss_fn, has_aux=True)
-                    loss, grads = grad_fn(train_state.params, traj_batch, advantages, targets)
+                    (total_loss, aux), grads = grad_fn(
+                        train_state.params, traj_batch, advantages, targets
+                    )
+                    grad_norm = optax.global_norm(grads)
                     train_state = train_state.apply_gradients(grads=grads)
-                    return train_state, loss
+                    value_loss, loss_actor, entropy, approx_kl, clip_frac = aux
+                    mb_metrics = {
+                        "total_loss": total_loss,
+                        "value_loss": value_loss,
+                        "policy_loss": loss_actor,
+                        "entropy": entropy,
+                        "approx_kl": approx_kl,
+                        "clip_frac": clip_frac,
+                        "grad_norm": grad_norm,
+                    }
+                    return train_state, mb_metrics
 
                 train_state, traj_batch, advantages, targets, rng = update_state
                 rng, _rng = jax.random.split(rng)
 
-                # Flatten [T, NE, N, ...] -> [T*NE*N, ...]
                 batch_size = config["ROLLOUT_LEN"] * config["NUM_ACTORS"]
                 permutation = jax.random.permutation(_rng, batch_size)
 
                 batch = (traj_batch, advantages, targets)
                 flat_batch = jax.tree.map(lambda x: x.reshape((batch_size,) + x.shape[3:]), batch)
-
                 shuffled_batch = jax.tree.map(lambda x: jnp.take(x, permutation, axis=0), flat_batch)
-
                 minibatches = jax.tree.map(
                     lambda x: jnp.reshape(x, [config["NUM_MINIBATCHES"], -1] + list(x.shape[1:])),
-                    shuffled_batch
+                    shuffled_batch,
                 )
 
-                train_state, losses = jax.lax.scan(_update_minibatch, train_state, minibatches)
-                return (train_state, traj_batch, advantages, targets, rng), losses
+                train_state, mb_metrics = jax.lax.scan(_update_minibatch, train_state, minibatches)
+                return (train_state, traj_batch, advantages, targets, rng), mb_metrics
 
             update_state = (train_state, traj_batch, advantages, targets, rng)
             update_state, loss_info = jax.lax.scan(
@@ -217,11 +238,27 @@ def make_train(env: MultiAgentEnv, config: dict):
             train_state = update_state[0]
             rng = update_state[-1]
 
+            # Mean PPO health metrics over (epochs, minibatches).
+            ppo = jax.tree.map(lambda x: x.mean(), loss_info)
+
+            # Action saturation: fraction of actions pinned near the [-1, 1] bounds.
+            action_saturation = (jnp.abs(traj_batch.action) > 0.98).mean()
+
             metrics = {
-                "loss": jax.tree.map(lambda x: x.mean(), loss_info),
+                # losses / RL health
+                "total_loss": ppo["total_loss"],
+                "value_loss": ppo["value_loss"],
+                "policy_loss": ppo["policy_loss"],
+                "entropy": ppo["entropy"],
+                "approx_kl": ppo["approx_kl"],
+                "clip_frac": ppo["clip_frac"],
+                "grad_norm": ppo["grad_norm"],
+                "explained_variance": explained_var,
+                "action_saturation": action_saturation,
+                # rollout summaries
                 "step_reward": traj_batch.reward.mean(),
                 "returned_episode_returns": traj_batch.info["returned_episode_returns"].mean(),
-                # mean over T and agents, keep NE dim for std-band computation
+                # policy means (keep NE dim for std-band plotting)
                 "c_frac_env": ((traj_batch.action[..., 0] + 1) / 2).mean(axis=(0, 2)),
                 "l_env": (
                     ((traj_batch.action[..., 1] + 1) / 2).mean(axis=(0, 2))
@@ -232,17 +269,22 @@ def make_train(env: MultiAgentEnv, config: dict):
 
             return (train_state, env_state, last_obs, rng), (metrics, train_state.params)
 
-        # 4. RUN SCAN OVER UPDATES
         final_state, (metrics, params_history) = jax.lax.scan(
             _update_step, (train_state, env_state, obsv, rng), None, config["NUM_UPDATES"]
         )
 
-        return {"params": final_state[0].params, "metrics": metrics, "params_history": params_history}
+        return {
+            "params": final_state[0].params,
+            "metrics": metrics,
+            "params_history": params_history,
+        }
 
     def train(rng):
-        """Eagerly initialise network params then dispatch to JIT-compiled core."""
         rng, init_rng = jax.random.split(rng)
         network_params = network.init(init_rng, init_x)
         return _train_core(rng, network_params)
 
+    # Expose derived config for callers (e.g. recorder, plotting axes).
+    train.config = config
+    train.network = network
     return train
