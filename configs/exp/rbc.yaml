@@ -15,6 +15,6 @@ env:
   obs_vars: [capital]
 
 train:
-  total_timesteps: 1000000
+  total_timesteps: 50000    # sequential steps (x num_envs=20 -> 1M transitions)
   num_minibatches: 10
   ent_coef: 0.01

@@ -9,7 +9,7 @@ axes:
   train.num_envs: [8, 32, 128]
 
 overrides:
-  train.total_timesteps: 400000
+  train.total_timesteps: 50000   # sequential: same training length per cell
   diag.economic: false
   diag.distributional: false
   run.device: auto

@@ -77,7 +77,7 @@ axes:
   env.n_agents: [10, 100, 1000, 10000]
   train.num_envs: [32, 128]
 overrides:
-  train.total_timesteps: 1000000
+  train.total_timesteps: 50000   # sequential env steps, independent of num_envs
 repeats: 1
 collect_diagnostics: true   # also tabulate Euler / Gini per cell
 save_cell_runs: false       # true -> full per-cell run dir + figures

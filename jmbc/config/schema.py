@@ -40,7 +40,10 @@ class TrainConfig:
 
     num_envs: int = 20
     rollout_len: int = 200
-    total_timesteps: int = 1_000_000
+    # Sequential env steps (each steps all num_envs in parallel) — training
+    # length is independent of num_envs. Total collected transitions =
+    # total_timesteps * num_envs.
+    total_timesteps: int = 50_000
     update_epochs: int = 10
     num_minibatches: int = 10
     lr: float = 3e-4

@@ -10,6 +10,6 @@ env:
   obs_vars: [capital, mean_capital, aggregate_state, kappa, lambda]
 
 train:
-  total_timesteps: 10000000
+  total_timesteps: 500000   # sequential steps (x num_envs=20 -> 10M transitions)
   num_minibatches: 20
   ent_coef: 0.0

@@ -44,9 +44,10 @@ def make_train(env: MultiAgentEnv, config: dict):
     """Return a train function. Network init happens eagerly (outside JIT)."""
     config = dict(config)  # defensive copy: do not mutate the caller's dict
     config["NUM_ACTORS"] = env.num_agents * config["NUM_ENVS"]
-    config["NUM_UPDATES"] = (
-        config["TOTAL_TIMESTEPS"] // config["ROLLOUT_LEN"] // config["NUM_ENVS"]
-    )
+    # TOTAL_TIMESTEPS counts *sequential* env steps (one step = all NUM_ENVS
+    # environments advancing once in parallel), so the training length is
+    # independent of how many envs run in parallel.
+    config["NUM_UPDATES"] = config["TOTAL_TIMESTEPS"] // config["ROLLOUT_LEN"]
     config["MINIBATCH_SIZE"] = (
         config["NUM_ACTORS"] * config["ROLLOUT_LEN"] // config["NUM_MINIBATCHES"]
     )

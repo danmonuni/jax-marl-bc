@@ -7,7 +7,7 @@ axes:
   train.num_envs: [4, 8]
 
 overrides:
-  train.total_timesteps: 4000
+  train.total_timesteps: 1000    # sequential: same training length per cell
   train.rollout_len: 20
   env.max_steps: 50
   diag.economic: false
