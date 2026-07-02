@@ -116,6 +116,8 @@ class SweepConfig:
     repeats: int = 1
     name: str = "sweep"
     collect_diagnostics: bool = True   # also tabulate Euler/Gini per cell
+    save_cell_runs: bool = False       # full per-cell output dir + figures
+                                       # (distributional/economic/training health)
 
 
 def to_train_dict(cfg: ExperimentConfig) -> dict:

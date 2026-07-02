@@ -80,6 +80,9 @@ overrides:
   train.total_timesteps: 1000000
 repeats: 1
 collect_diagnostics: true   # also tabulate Euler / Gini per cell
+save_cell_runs: false       # true -> full per-cell run dir + figures
+                            # (wealth distribution, Euler panel, training health)
+                            # under benchmarks/<name>/cells/
 ```
 
 ## Package layout

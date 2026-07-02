@@ -58,6 +58,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
 
     from .experiments.common import run_single
     from .plots import make_benchmark_figures
+    from .recorder import RunRecorder
     import pandas as pd
 
     axes = OmegaConf.to_container(scfg.axes, resolve=True) or {}
@@ -78,12 +79,17 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
             cfg = load_config(scfg.base_exp, dotlist)
             tag = ", ".join(f"{k.split('.')[-1]}={v}" for k, v in zip(keys, combo))
             print(f"[sweep {n}/{total}] {tag} rep={rep}")
+            recorder = None
+            if scfg.save_cell_runs:
+                slug = "_".join(f"{k.split('.')[-1]}{v}" for k, v in zip(keys, combo))
+                recorder = RunRecorder(str(out_dir / "cells"), scfg.base_exp,
+                                       f"{slug or 'base'}_rep{rep}")
             res = run_single(
                 cfg,
-                recorder=None,
+                recorder=recorder,
                 seed=int(cfg.run.seed) + rep,
                 do_diagnostics=bool(scfg.collect_diagnostics),
-                do_figures=False,
+                do_figures=bool(scfg.save_cell_runs),
                 benchmark=True,
             )
             row = {"method": "jaxmarl-bc", "base_exp": scfg.base_exp, "repeat": rep}
