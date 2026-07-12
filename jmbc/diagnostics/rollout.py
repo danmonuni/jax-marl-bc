@@ -15,18 +15,20 @@ import jax.numpy as jnp
 import numpy as np
 
 
-def _simulate_jax(env, net, params, key, n_steps=2000):
-    """Pure-JAX deterministic rollout returning JAX arrays (vmap-composable).
-
-    Uses the array interface (reset_mat/step_mat) when the env provides it, so
-    trace size stays independent of n_agents; falls back to the dict API.
-    """
-    use_vec = hasattr(env, "step_mat")
-    if use_vec:
+def _init_carry(env, key):
+    """(obs_mat, state, key) initial carry via the fastest available interface."""
+    if hasattr(env, "reset_mat"):
         obs_mat0, state = env.reset_mat(key)
     else:
         obs0, state = env.reset(key)
         obs_mat0 = jnp.stack([obs0[a] for a in env.agents])
+    return obs_mat0, state, key
+
+
+def _make_step(env, net, params):
+    """Build the recording step function. ``params`` may be a tracer, so the
+    same compiled program serves every training snapshot."""
+    use_vec = hasattr(env, "step_mat")
     alpha, delta = env.alpha, env.delta
     kappas, lambdas = env.kappas, env.lambdas
     # Column of the capital observation, for the finite-difference MPC probe.
@@ -98,13 +100,61 @@ def _simulate_jax(env, net, params, key, n_steps=2000):
         }
         return (obs_mat_n, state, key), record
 
-    _, rec = jax.lax.scan(_step, (obs_mat0, state, key), None, length=n_steps)
+    return _step
+
+
+def _simulate_jax(env, net, params, key, n_steps=2000):
+    """Pure-JAX deterministic rollout returning JAX arrays (vmap-composable)."""
+    step = _make_step(env, net, params)
+    carry = _init_carry(env, key)
+    _, rec = jax.lax.scan(step, carry, None, length=n_steps)
     return rec
 
 
-def simulate(env, net, params, key, n_steps=2000):
-    """Deterministic (mean-action) rollout compiled with lax.scan -> numpy dict."""
-    return jax.tree.map(np.array, _simulate_jax(env, net, params, key, n_steps))
+_RUNNER_CACHE = {}
+
+
+def _segment_runner(env, net):
+    """Jitted (params, carry, length) -> (carry, rec) segment executor.
+
+    Cached per (env, net): one compile serves every snapshot and segment (a
+    second one for a remainder segment of different length).
+    """
+    cache_key = (id(env), id(net))
+    if cache_key not in _RUNNER_CACHE:
+        from functools import partial
+
+        @partial(jax.jit, static_argnames=("length",))
+        def run(params, carry, length):
+            step = _make_step(env, net, params)
+            return jax.lax.scan(step, carry, None, length=length)
+
+        _RUNNER_CACHE[cache_key] = run
+    return _RUNNER_CACHE[cache_key]
+
+
+def simulate(env, net, params, key, n_steps=2000, max_chunk_bytes=2.56e8):
+    """Deterministic (mean-action) rollout -> numpy dict.
+
+    Runs in segments sized so the on-device record buffer stays under
+    ``max_chunk_bytes`` (~12 float channels x n_agents per step), streaming
+    each segment to host RAM. Device memory for diagnostics is therefore flat
+    in ``n_steps`` — large-population evals cannot OOM the accelerator.
+    """
+    per_step_bytes = 4 * 12 * max(env.num_agents, 1)
+    chunk = int(max(1, min(n_steps, max_chunk_bytes // per_step_bytes)))
+    run = _segment_runner(env, net)
+    carry = _init_carry(env, key)
+    parts = []
+    done = 0
+    while done < n_steps:
+        length = min(chunk, n_steps - done)
+        carry, rec = run(params, carry, length=length)
+        parts.append(jax.tree.map(np.asarray, rec))  # blocks; offloads to host
+        done += length
+    if len(parts) == 1:
+        return parts[0]
+    return {k: np.concatenate([p[k] for p in parts]) for k in parts[0]}
 
 
 def simulate_seeds(env, net, params, keys, n_steps=2000):

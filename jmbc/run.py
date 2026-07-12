@@ -21,7 +21,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         raise SystemExit(2)
 
     cfg = load_config(exp, overrides)
-    setup_device(cfg.run.device)  # must precede any jax import
+    setup_device(cfg.run.device, bool(cfg.run.prealloc))  # before any jax import
 
     # Import jax-dependent code only after the device is fixed.
     from .experiments import get_driver

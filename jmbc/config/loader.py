@@ -104,11 +104,15 @@ def parse_cli(argv: Sequence[str], key: str = "exp") -> Tuple[Optional[str], Lis
     return selector, overrides
 
 
-def setup_device(device: str) -> None:
+def setup_device(device: str, prealloc: bool = False) -> None:
     """Resolve the JAX platform *before* JAX is imported.
 
     "auto" leaves JAX to pick the best backend (GPU on Colab T4, else CPU).
     Call this prior to importing any jax-dependent module.
+
+    ``prealloc=True`` lets JAX grab its standard 75% GPU pool up front:
+    contiguous, fragmentation-free — the right mode for one big training run.
+    False (default) grows on demand so several processes can share the GPU.
     """
     device = (device or "auto").lower()
     if device == "cpu":
@@ -116,5 +120,6 @@ def setup_device(device: str) -> None:
     elif device in ("gpu", "cuda"):
         os.environ["JAX_PLATFORM_NAME"] = "gpu"
     # "auto": do not constrain the platform.
-    # Avoid pre-allocating the whole GPU so several cells/agents can coexist.
-    os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
+    os.environ.setdefault(
+        "XLA_PYTHON_CLIENT_PREALLOCATE", "true" if prealloc else "false"
+    )

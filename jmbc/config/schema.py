@@ -100,6 +100,9 @@ class RunConfig:
 
     seed: int = 0
     device: str = "auto"                    # "auto" | "cpu" | "gpu"
+    # Preallocate the GPU pool (75%) instead of growing on demand: fewer
+    # fragmentation OOMs for big solo runs; keep false to share the GPU.
+    prealloc: bool = False
 
 
 @dataclass

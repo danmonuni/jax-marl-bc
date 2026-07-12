@@ -54,7 +54,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
 
     # Resolve device from the base experiment config before importing jax.
     base_cfg = load_config(scfg.base_exp, base_over)
-    setup_device(base_cfg.run.device)
+    setup_device(base_cfg.run.device, bool(base_cfg.run.prealloc))
 
     from .experiments.common import run_single
     from .plots import make_benchmark_figures

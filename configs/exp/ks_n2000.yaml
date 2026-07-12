@@ -1,0 +1,33 @@
+# KS population-scaling cell: n = 2000 — equal-learning protocol.
+# See ks_n20.yaml for the full protocol rationale (complexity-report.md §9.7):
+# all cells share the optimizer trajectory (2000 updates x 16 gradient steps,
+# same LR schedule, same seed -> identical theta_0), the per-update aggregate
+# information (E=32, T=64 -> I_agg ~ 293), and the evaluation population
+# (diag.n_agents=2000). Only the trained population n differs.
+#
+# Memory (largest cell, sets the shared E ceiling): B = 64*32*2000 = 4.1M
+# transitions/update, ~230 MB per buffer copy, ~0.9 GB shuffle liveness
+# + ~2.2 GB minibatch working set -> ~3.1 GB, ~21% of a T4 (§7).
+extends: ks
+
+env:
+  n_agents: 2000
+
+train:
+  num_envs: 32
+  rollout_len: 64
+  total_timesteps: 128000   # = 2000 updates x 64 sequential steps
+  update_epochs: 4
+  num_minibatches: 4
+  log_every: 100
+
+diag:
+  n_agents: 2000            # common evaluation population for all cells
+
+log:
+  save_agents: 200          # full-n raw rollouts would be ~GBs; aggregates complete
+
+run:
+  device: gpu
+  prealloc: true
+  seed: 0

@@ -10,7 +10,7 @@
 extends: ks
 
 env:
-  n_agents: 2000
+  n_agents: 20
 
 train:
   num_envs: 16
@@ -27,3 +27,5 @@ log:
 
 run:
   device: gpu
+  prealloc: true            # one big solo run: grab the 75% pool up front,
+                            # no fragmentation OOMs

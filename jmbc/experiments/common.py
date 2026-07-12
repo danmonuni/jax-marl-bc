@@ -33,6 +33,25 @@ def _print_launch_summary(cfg, env, train_fn, seed: int) -> None:
     lr = f"{c['LR']:g}" + (" (annealed)" if c.get("ANNEAL_LR") else " (constant)")
     iface = "vector [n,d] arrays" if c.get("VEC_INTERFACE") else "jaxmarl per-agent dicts"
 
+    # Device-memory forecast (fp32). Peak liveness in the update phase holds
+    # ~4 full-batch tensors at once: stacked trajectory, flattened+shuffled
+    # copy (the big single allocation that OOMs first), minibatch reshape,
+    # and gather workspace. Per sample: obs + action + (value, reward,
+    # log_prob, done, advantage, target, info) ~ 7 scalars.
+    per_sample = (env.obs_dim + getattr(env, "act_dim", 1) + 7) * 4
+    buf_gb = 4 * E * R * n * per_sample / 1e9
+    upd_gb = c["MINIBATCH_SIZE"] * (sum(c["HIDDEN_DIMS"]) + 8) * 4 * 4 / 1e9
+    mem_txt = f"est. device ~{buf_gb + upd_gb:.2f} GB (buffer {buf_gb:.2f} + update {upd_gb:.2f})"
+    try:
+        limit = jax.local_devices()[0].memory_stats().get("bytes_limit")
+        if limit:
+            pct = 100 * (buf_gb + upd_gb) / (limit / 1e9)
+            mem_txt += f" | device {limit / 1e9:.1f} GB -> ~{pct:.0f}%"
+            if pct > 80:
+                mem_txt += "  ** >80%: likely OOM, raise num_minibatches / lower num_envs **"
+    except Exception:
+        pass
+
     rows = [
         ("economy", f"{cfg.env.kind} | {n} agents | obs[{env.obs_dim}]: "
                     f"{', '.join(env.obs_vars)}"),
@@ -47,8 +66,9 @@ def _print_launch_summary(cfg, env, train_fn, seed: int) -> None:
                      f" | ent {c['ENT_COEF']} | vf {c['VF_COEF']}"),
         ("network",  f"hidden {list(c['HIDDEN_DIMS'])} {c['ACTIVATION']}"
                      f" | {n_params:,} params | interface: {iface}"),
+        ("memory",   mem_txt),
         ("diag",     f"{cfg.diag.n_snapshots} snapshots x {cfg.diag.sim_steps:,}"
-                     f" eval steps (reset-free) | burn_frac {cfg.diag.burn_frac}"),
+                     f" eval steps (reset-free, chunked) | burn_frac {cfg.diag.burn_frac}"),
         ("run",      f"seed {seed} | backend {jax.default_backend()}"
                      f" | heartbeat every {c.get('LOG_EVERY', 0)} updates"),
     ]
