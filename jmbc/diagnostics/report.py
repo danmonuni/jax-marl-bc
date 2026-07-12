@@ -49,10 +49,19 @@ def compute_diagnostics(
     # in the observation), so simulating past the training max_steps is valid —
     # and it stops post-reset transients (economy restarted at k_init) from
     # contaminating the "stationary" slice that every probe averages over.
-    if int(env.max_steps) <= int(diag_cfg.sim_steps):
+    # Optionally evaluate at a larger population than training (mean-field:
+    # the policy is population-size-agnostic), e.g. train n=200, simulate n=2000.
+    eval_n = int(diag_cfg.n_agents) if diag_cfg.n_agents else env.num_agents
+    if int(env.max_steps) <= int(diag_cfg.sim_steps) or eval_n != env.num_agents:
         from ..envs import build_env
         eval_cfg = copy.deepcopy(env_cfg)
-        eval_cfg.max_steps = int(diag_cfg.sim_steps) + 1
+        eval_cfg.max_steps = max(int(diag_cfg.sim_steps) + 1, int(env_cfg.max_steps))
+        if eval_n != env.num_agents:
+            if env_cfg.kappas is not None or env_cfg.lambdas is not None:
+                raise ValueError(
+                    "diag.n_agents requires homogeneous agents (kappas/lambdas null)"
+                )
+            eval_cfg.n_agents = eval_n
         env = build_env(eval_cfg)
 
     num_updates = int(jax.tree_util.tree_leaves(params_history)[0].shape[0])

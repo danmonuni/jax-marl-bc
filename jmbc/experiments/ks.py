@@ -20,7 +20,8 @@ def run(cfg, out_dir: str, run_id: str) -> dict:
     idxs = res["idxs"]
     if recs is not None and len(recs) >= 1:
         if getattr(cfg.log, "save_raw", True):
-            rec.save_rollouts(recs, idxs, res["steps_per_update"])
+            rec.save_rollouts(recs, idxs, res["steps_per_update"],
+                              max_agents=cfg.log.save_agents)
             size_mb = (rec.dir / "rollouts.npz").stat().st_size / 1e6
             phase(f"raw rollouts saved: rollouts.npz ({size_mb:.1f} MB)")
         snap_steps = (np.asarray(idxs) + 1) * res["steps_per_update"]

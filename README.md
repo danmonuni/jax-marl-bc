@@ -29,6 +29,9 @@ pip install -r requirements.txt   # uses jax[cuda12]
 python -m jmbc.run exp=rbc                       # textbook + typical RBC
 python -m jmbc.run exp=ks                         # Krusell-Smith (full budget, Colab)
 python -m jmbc.run exp=ks_local                   # same KS economy, ~5 min on CPU
+python -m jmbc.run exp=ks_remote                  # GPU-shaped: wide batches, short
+                                                  # serial chains; train n=200,
+                                                  # evaluate at diag.n_agents=2000
 python -m jmbc.run exp=general                    # heterogeneous RBC grid
 
 # Override anything via OmegaConf dotlist:

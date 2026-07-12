@@ -1,0 +1,29 @@
+# Remote GPU (Colab T4) config: full-size training (n_agents=2000), workload
+# reshaped for GPU. The T4 loses to a laptop CPU on long chains of small
+# kernels, so this config attacks sequential depth and feeds it width:
+#   - update_epochs 10->4, num_minibatches 20->4: sequential optimizer
+#     iterations per update drop 200 -> 16, each a ~2M-sample dense batch;
+#   - rollout_len 200->64, num_envs 20->16: 3x shorter serial env chain with
+#     [16, 2000]-wide env kernels; batch/update is still ~2M transitions.
+# Optional (off by default): train smaller and evaluate large by setting
+# env.n_agents=200 diag.n_agents=2000 — the policy is population-size-agnostic.
+extends: ks
+
+env:
+  n_agents: 2000
+
+train:
+  num_envs: 16
+  rollout_len: 64
+  total_timesteps: 128000   # = 2000 updates x 64 sequential steps
+                            # -> x16 envs x2000 agents ~ 4.1B agent-transitions
+  update_epochs: 4
+  num_minibatches: 4
+  log_every: 100
+
+log:
+  save_agents: 200          # per-agent series saved for 200 of 2000 agents
+                            # (aggregates complete; full-n rollouts ~ 5 GB)
+
+run:
+  device: gpu

@@ -92,14 +92,26 @@ class RunRecorder:
         with open(self.dir / "timing.json", "w") as f:
             json.dump(_jsonable(timing), f, indent=2)
 
-    def save_rollouts(self, recs, idxs, steps_per_update: int) -> None:
+    def save_rollouts(self, recs, idxs, steps_per_update: int,
+                      max_agents: Optional[int] = None) -> None:
         """Persist the raw snapshot rollouts: one array per channel with a
-        leading snapshot axis, plus the snapshot -> training-step mapping."""
+        leading snapshot axis, plus the snapshot -> training-step mapping.
+
+        ``max_agents``: keep only the first ``max_agents`` agents in per-agent
+        channels (aggregate channels are always complete) so the file stays
+        transferable at large n_agents.
+        """
+        n = recs[0]["ks"].shape[-1]
         arrays = {}
         for k in recs[0]:
-            arrays[k] = np.stack([np.asarray(r[k]) for r in recs])
+            a = np.stack([np.asarray(r[k]) for r in recs])
+            if max_agents is not None and a.ndim >= 3 and a.shape[-1] == n:
+                a = a[..., : int(max_agents)]
+            arrays[k] = a
         arrays["snap_update_idxs"] = np.asarray(idxs, np.int64)
         arrays["snap_env_steps"] = (np.asarray(idxs, np.int64) + 1) * int(steps_per_update)
+        if max_agents is not None:
+            arrays["saved_agents"] = np.asarray(min(int(max_agents), n), np.int64)
         np.savez_compressed(self.dir / "rollouts.npz", **arrays)
 
     def figure_path(self, name: str) -> str:
@@ -111,7 +123,8 @@ def load_rollouts(run_dir):
     with np.load(Path(run_dir) / "rollouts.npz") as z:
         idxs = z["snap_update_idxs"]
         env_steps = z["snap_env_steps"]
-        keys = [k for k in z.files if not k.startswith("snap_")]
+        keys = [k for k in z.files
+                if not k.startswith("snap_") and k != "saved_agents"]
         recs = [{k: z[k][s] for k in keys} for s in range(len(idxs))]
     return recs, idxs, env_steps
 

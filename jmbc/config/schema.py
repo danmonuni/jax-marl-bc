@@ -71,6 +71,10 @@ class DiagConfig:
 
     n_snapshots: int = 4                    # training snapshots for diagnostics
     sim_steps: int = 2000                   # rollout length used for diagnostics
+    # Evaluate the trained policy on a LARGER population than it was trained
+    # with (policy inputs are per-agent + aggregates -> size-agnostic).
+    # None -> same as env.n_agents. Requires kappas/lambdas = null (homogeneous).
+    n_agents: Optional[int] = None
     economic: bool = True                   # Euler errors, resource residual, etc.
     distributional: bool = True             # Gini, Lorenz, top shares, MPC
     burn_frac: float = 0.5                  # fraction of rollout discarded as burn-in
@@ -83,6 +87,11 @@ class LogConfig:
     out_dir: str = "runs"
     run_name: Optional[str] = None          # None -> auto timestamped id
     save_raw: bool = True                   # persist raw snapshot rollouts (npz)
+    # Subsample of agents kept in the SAVED per-agent series (None = all).
+    # In-process diagnostics always use every agent; aggregate channels
+    # (K, Y, agg_state, ...) are always saved in full. Keeps rollouts.npz
+    # transferable for large n_agents (2000 agents full ~ 5 GB).
+    save_agents: Optional[int] = None
 
 
 @dataclass
