@@ -46,6 +46,9 @@ paper.pdf
 
 results
 results/
+runs/
+.archive/
 benchmarks/
 .sources/
 .ipynb_checkpoints/
+.bal

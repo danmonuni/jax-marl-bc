@@ -43,17 +43,33 @@ GPU on Colab and CPU otherwise.
 Every run writes a self-contained, reproducible directory:
 
 ```
-results/<exp>/<run_id>/
+runs/<exp>/<run_id>/
   config.yaml          # fully resolved configuration
   metrics.csv          # per-update training metrics (loss, KL, clip frac, ...)
   diagnostics.json     # economic + distributional probes across snapshots
   timing.json          # wall time, throughput, device
+  rollouts.npz         # RAW snapshot rollouts: every recorded channel
+                       # (capital, wealth, consumption, MPC, employment,
+                       # aggregate state, ...) at each training snapshot
   figures/
     training_health.png      # PPO convergence panel
     economic.png             # Euler error (+ KS R²/Den Haan) vs steps
     distributional.png       # Gini & top shares vs steps
+    ks_lom_evolution.png     # aggregate law of motion through training
+    ks_wealth_heatmap.png    # wealth distribution vs training (density heatmap)
+    ks_mpc.png               # MPC by wealth/employment + through training
     <bespoke>.png            # rbc policy / ks_fig4 / figure5
 ```
+
+`rollouts.npz` is the complete experimental record: every figure and every
+diagnostic can be recomputed **ex post, without retraining and without a GPU**:
+
+```bash
+python -m jmbc.analyze runs/ks/<run_id>          # rebuild diagnostics + figures
+```
+
+The intended loop: train on Colab (GPU) or locally (CPU), sync the run
+directory, then iterate on diagnostics/figures locally against the saved data.
 
 ## Sweep / benchmark
 
@@ -85,21 +101,37 @@ save_cell_runs: false       # true -> full per-cell run dir + figures
                             # under benchmarks/<name>/cells/
 ```
 
-## Package layout
+## Repository map
+
+Everything you edit lives in `jmbc/` + `configs/`; everything generated lands
+in `runs/` (single experiments) or `benchmarks/` (sweeps), both git-ignored.
 
 ```
-jmbc/
-  config/      schema.py (dataclasses), loader.py (YAML + CLI merge)
-  envs/        RBCKLEnv, RBCKSEnv (JaxMARL MultiAgentEnv), registry.build_env
-  algos/       ActorCritic, make_train (PPO + in-loop health metrics)
-  diagnostics/ rollout, economic, distributional, report (snapshots)
-  plots/       style, training, figures (bespoke), benchmark (scaling)
-  experiments/ rbc, ks, general drivers + common.run_single
-  recorder.py  structured run output + timing helpers
-  run.py       experiment CLI        sweep.py  meta/benchmark CLI
-configs/       base.yaml, exp/*.yaml, sweep/*.yaml
-notebooks/     quickstart.ipynb
+configs/                 WHAT to run
+  base.yaml                shared defaults
+  exp/{rbc,ks,general}     one file per experiment
+  sweep/*.yaml             scaling / benchmark grids
+jmbc/                    HOW it runs
+  run.py                   CLI: train one experiment      -> runs/<exp>/<id>/
+  sweep.py                 CLI: benchmark grid            -> benchmarks/<name>/
+  analyze.py               CLI: recompute figures + diagnostics from a saved run
+  config/                  typed schema + YAML/CLI loading
+  envs/                    RBCKLEnv (RBC), RBCKSEnv (Krusell-Smith), registry
+  algos/                   ActorCritic + PPO make_train (the RL kernel)
+  experiments/             per-experiment drivers, common.run_single
+  diagnostics/             rollout recorder, economic + distributional probes
+  plots/                   style, training health, KS semantic figures, benchmarks
+  recorder.py              run directory writer (config/metrics/rollouts/timing)
+tests/                   env semantics, rollout, diagnostics checks
+notebooks/quickstart     Colab walkthrough
+paper.md                 the systems paper draft
+.sources/                reference PDFs + the original pre-refactor PPO script
+.archive/                superseded generated outputs (pre-env-fix results)
 ```
+
+Data flow: `configs/` → `jmbc.run` → `runs/<exp>/<run_id>/` (complete record,
+incl. `rollouts.npz`) → `jmbc.analyze` (iterate on figures/diagnostics ex post,
+no retraining).
 
 ## Notebook
 

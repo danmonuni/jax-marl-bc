@@ -5,6 +5,10 @@ Each run gets ``<out_dir>/<exp>/<run_id>/`` containing:
     metrics.csv        per-update training metrics
     diagnostics.json   economic + distributional probes across snapshots
     timing.json        compile/run split, throughput, device
+    rollouts.npz       raw snapshot rollouts (every recorded channel, all
+                       snapshots stacked on a leading axis) — the complete
+                       experimental record from which every figure and
+                       diagnostic can be recomputed ex post (jmbc.analyze)
     figures/*.png      figures
 """
 from __future__ import annotations
@@ -76,8 +80,28 @@ class RunRecorder:
         with open(self.dir / "timing.json", "w") as f:
             json.dump(_jsonable(timing), f, indent=2)
 
+    def save_rollouts(self, recs, idxs, steps_per_update: int) -> None:
+        """Persist the raw snapshot rollouts: one array per channel with a
+        leading snapshot axis, plus the snapshot -> training-step mapping."""
+        arrays = {}
+        for k in recs[0]:
+            arrays[k] = np.stack([np.asarray(r[k]) for r in recs])
+        arrays["snap_update_idxs"] = np.asarray(idxs, np.int64)
+        arrays["snap_env_steps"] = (np.asarray(idxs, np.int64) + 1) * int(steps_per_update)
+        np.savez_compressed(self.dir / "rollouts.npz", **arrays)
+
     def figure_path(self, name: str) -> str:
         return str(self.fig_dir / name)
+
+
+def load_rollouts(run_dir):
+    """Inverse of ``save_rollouts``: return (recs, idxs, env_steps)."""
+    with np.load(Path(run_dir) / "rollouts.npz") as z:
+        idxs = z["snap_update_idxs"]
+        env_steps = z["snap_env_steps"]
+        keys = [k for k in z.files if not k.startswith("snap_")]
+        recs = [{k: z[k][s] for k in keys} for s in range(len(idxs))]
+    return recs, idxs, env_steps
 
 
 # ── timing helpers ────────────────────────────────────────────────────────────

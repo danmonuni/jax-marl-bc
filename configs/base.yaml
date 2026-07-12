@@ -16,6 +16,7 @@ train:
   vf_coef: 0.5
   max_grad_norm: 0.5
   anneal_lr: false
+  log_every: 100     # progress heartbeat every N updates (0 = silent)
 
 net:
   hidden_dims: [64, 64]
@@ -29,7 +30,8 @@ diag:
   burn_frac: 0.5
 
 log:
-  out_dir: results
+  out_dir: runs      # complete experimental record per run (rollouts.npz, ...)
+  save_raw: true
 
 run:
   seed: 0

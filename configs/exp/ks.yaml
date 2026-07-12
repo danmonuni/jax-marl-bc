@@ -7,9 +7,15 @@ env:
   delta: 0.025
   max_steps: 500
   k_init: 1.0
-  obs_vars: [capital, mean_capital, aggregate_state, kappa, lambda]
+  # `labour` = own employment status x productivity: without it the policy
+  # cannot condition consumption on being unemployed (no precautionary motive).
+  obs_vars: [capital, labour, mean_capital, aggregate_state, kappa, lambda]
 
 train:
   total_timesteps: 500000   # sequential steps (x num_envs=20 -> 10M transitions)
   num_minibatches: 20
   ent_coef: 0.0
+
+diag:
+  n_snapshots: 12   # resolution of the training-evolution figures (heatmap etc.)
+  sim_steps: 5000   # one long reset-free evaluation episode (KS-style long sim)

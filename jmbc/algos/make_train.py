@@ -90,7 +90,7 @@ def make_train(env: MultiAgentEnv, config: dict):
         obsv, env_state = jax.vmap(env.reset)(reset_rng)
 
         # 3. TRAINING LOOP
-        def _update_step(runner_state, _):
+        def _update_step(runner_state, update_i):
             train_state, env_state, last_obs, rng = runner_state
 
             # 3.1 COLLECT TRAJECTORIES
@@ -268,10 +268,25 @@ def make_train(env: MultiAgentEnv, config: dict):
                 ),
             }
 
+            # Progress heartbeat (host callback; read-only, no effect on the
+            # training dynamics or the RNG stream).
+            log_every = int(config.get("LOG_EVERY", 0) or 0)
+            if log_every > 0:
+                def _log():
+                    jax.debug.print(
+                        "[train] update {i}/{n}  reward={r:.4f}  approx_kl={kl:.5f}  "
+                        "c_frac={c:.3f}  entropy={e:.3f}",
+                        i=update_i + 1, n=config["NUM_UPDATES"],
+                        r=metrics["step_reward"], kl=metrics["approx_kl"],
+                        c=metrics["c_frac_env"].mean(), e=metrics["entropy"],
+                    )
+                jax.lax.cond((update_i + 1) % log_every == 0, _log, lambda: None)
+
             return (train_state, env_state, last_obs, rng), (metrics, train_state.params)
 
         final_state, (metrics, params_history) = jax.lax.scan(
-            _update_step, (train_state, env_state, obsv, rng), None, config["NUM_UPDATES"]
+            _update_step, (train_state, env_state, obsv, rng),
+            jnp.arange(config["NUM_UPDATES"]),
         )
 
         return {

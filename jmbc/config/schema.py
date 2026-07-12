@@ -54,6 +54,7 @@ class TrainConfig:
     ent_coef: float = 0.01
     anneal_lr: bool = False
     max_grad_norm: float = 0.5
+    log_every: int = 100                    # progress print every N updates (0 = silent)
 
 
 @dataclass
@@ -79,8 +80,9 @@ class DiagConfig:
 class LogConfig:
     """Where structured results are written."""
 
-    out_dir: str = "results"
+    out_dir: str = "runs"
     run_name: Optional[str] = None          # None -> auto timestamped id
+    save_raw: bool = True                   # persist raw snapshot rollouts (npz)
 
 
 @dataclass
@@ -140,6 +142,7 @@ def to_train_dict(cfg: ExperimentConfig) -> dict:
         "ENT_COEF": float(t.ent_coef),
         "ANNEAL_LR": bool(t.anneal_lr),
         "MAX_GRAD_NORM": float(t.max_grad_norm),
+        "LOG_EVERY": int(t.log_every),
         "HIDDEN_DIMS": tuple(int(x) for x in n.hidden_dims),
         "ACTIVATION": str(n.activation),
     }

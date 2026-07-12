@@ -45,6 +45,32 @@ def build_ks_P():
 KS_P = build_ks_P()
 
 
+def build_ks_conditional():
+    """Factor the 4-state chain into (aggregate chain, conditional employment).
+
+    The aggregate productivity state must be a SINGLE common shock: one z'
+    draw per period shared by every agent, then per-agent employment draws
+    from P(emp' | emp, z -> z'). Drawing the joint 4-state chain independently
+    per agent and aggregating (e.g. majority vote) makes the aggregate state
+    switch with probability ~0 for n >= ~20 agents, killing aggregate risk.
+
+    Returns (P_z [2,2], P_uu [2,2], P_eu [2,2]) indexed [z, z'] with
+    z: 0=bad 1=good. P_uu = P(stay unemployed), P_eu = P(emp -> unemployed).
+    """
+    u_g = 0.04; u_b = 0.10
+    p_uu_bb = 1 - 1 / 2.5; p_eu_bb = u_b * (1 - p_uu_bb) / (1 - u_b)
+    p_uu_gg = 1 - 1 / 1.5; p_eu_gg = u_g * (1 - p_uu_gg) / (1 - u_g)
+    p_uu_bg = u_g; p_eu_bg = u_g
+    p_uu_gb = u_b; p_eu_gb = u_b
+    P_z = jnp.array([[7 / 8, 1 / 8], [1 / 8, 7 / 8]], jnp.float32)
+    P_uu = jnp.array([[p_uu_bb, p_uu_bg], [p_uu_gb, p_uu_gg]], jnp.float32)
+    P_eu = jnp.array([[p_eu_bb, p_eu_bg], [p_eu_gb, p_eu_gg]], jnp.float32)
+    return P_z, P_uu, P_eu
+
+
+KS_PZ, KS_PUU, KS_PEU = build_ks_conditional()
+
+
 def ks_stationary_distribution(P=None):
     """Stationary distribution over (Bad/Good x Unemp/Emp) for verification.
 
@@ -92,7 +118,8 @@ class RBCKSEnv(MultiAgentEnv):
         self.obs_dim   = len(obs_vars)
         self.act_dim   = 1
         self.agents    = [f"agent_{i}" for i in range(n_agents)]
-        self.P         = KS_P
+        self.P         = KS_P                      # joint chain (reference/tests)
+        self.P_z, self.P_uu, self.P_eu = KS_PZ, KS_PUU, KS_PEU
         self.observation_spaces = {a: Box(-jnp.inf, jnp.inf, (self.obs_dim,))
                                    for a in self.agents}
         self.action_spaces      = {a: Box(-0.99, 0.99, (self.act_dim,))
@@ -129,12 +156,13 @@ class RBCKSEnv(MultiAgentEnv):
         cs = c_fracs*w;  ks_new = jnp.maximum((1-c_fracs)*w, 1e-8)
         rews = jnp.clip(jnp.log(jnp.maximum(cs,1e-8)), -1e5, 1e10)
 
-        key, sk = jax.random.split(state.key)
-        idx   = 2*state.agg_state + state.emp_states          # ∈ {0,1,2,3}
-        def _next(sk_i, s): return jax.random.choice(sk_i, 4, p=self.P[s])
-        new_combined = vmap(_next)(jax.random.split(sk, self.num_agents), idx)
-        new_agg = (jnp.mean(new_combined//2) > 0.5).astype(jnp.int32)
-        new_emp = new_combined % 2
+        # One common aggregate shock, then employment conditional on (z -> z').
+        key, sk_z, sk_e = jax.random.split(state.key, 3)
+        new_agg = jax.random.choice(sk_z, 2, p=self.P_z[state.agg_state]).astype(jnp.int32)
+        p_unemp = jnp.where(state.emp_states == 0,
+                            self.P_uu[state.agg_state, new_agg],
+                            self.P_eu[state.agg_state, new_agg])
+        new_emp = (jax.random.uniform(sk_e, (self.num_agents,)) > p_unemp).astype(jnp.int32)
         new_ls  = jnp.where(new_emp==1, KS_L_EMP, KS_L_UNE)
         A_new   = jnp.where(new_agg==1, KS_A_GOOD, KS_A_BAD)
 

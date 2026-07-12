@@ -6,6 +6,7 @@ runs the economic and distributional probes at each, so we can show quantities
 """
 from __future__ import annotations
 
+import copy
 from typing import Dict, List, Tuple
 
 import jax
@@ -44,6 +45,16 @@ def compute_diagnostics(
     recs     : simulated rollouts at each snapshot (for bespoke figures).
     idxs     : the snapshot update indices.
     """
+    # Evaluate on ONE uninterrupted episode. The policy is stationary (no time
+    # in the observation), so simulating past the training max_steps is valid —
+    # and it stops post-reset transients (economy restarted at k_init) from
+    # contaminating the "stationary" slice that every probe averages over.
+    if int(env.max_steps) <= int(diag_cfg.sim_steps):
+        from ..envs import build_env
+        eval_cfg = copy.deepcopy(env_cfg)
+        eval_cfg.max_steps = int(diag_cfg.sim_steps) + 1
+        env = build_env(eval_cfg)
+
     num_updates = int(jax.tree_util.tree_leaves(params_history)[0].shape[0])
     idxs = snapshot_indices(num_updates, diag_cfg.n_snapshots)
     key = jax.random.PRNGKey(seed)
