@@ -30,8 +30,12 @@ def load_config(
 ) -> DictConfig:
     """Build an ExperimentConfig as an OmegaConf object.
 
-    Merge order (later wins): structured defaults < base.yaml < exp/<exp>.yaml
-    < CLI dotlist overrides (e.g. ``env.n_agents=1000``).
+    Merge order (later wins): structured defaults < base.yaml < [extends
+    parent] < exp/<exp>.yaml < CLI dotlist overrides (e.g. ``env.n_agents=1000``).
+
+    An exp file may declare ``extends: <name>`` (one level) to inherit another
+    exp file and override only what differs — e.g. ``ks_local`` = ``ks`` with a
+    shorter training budget.
     """
     root = _root(config_root)
     cfg = OmegaConf.structured(ExperimentConfig)
@@ -44,8 +48,19 @@ def load_config(
         exp_file = root / "exp" / f"{exp}.yaml"
         if not exp_file.exists():
             raise FileNotFoundError(f"No experiment config: {exp_file}")
-        cfg = OmegaConf.merge(cfg, OmegaConf.load(exp_file))
-        cfg.exp = exp
+        exp_conf = OmegaConf.load(exp_file)
+        parent = exp_conf.pop("extends", None)
+        explicit_exp = "exp" in exp_conf
+        if parent:
+            parent_file = root / "exp" / f"{parent}.yaml"
+            if not parent_file.exists():
+                raise FileNotFoundError(f"extends: no such experiment: {parent_file}")
+            parent_conf = OmegaConf.load(parent_file)
+            explicit_exp = explicit_exp or "exp" in parent_conf
+            cfg = OmegaConf.merge(cfg, parent_conf)
+        cfg = OmegaConf.merge(cfg, exp_conf)
+        if not explicit_exp:
+            cfg.exp = exp
 
     if overrides:
         cfg = OmegaConf.merge(cfg, OmegaConf.from_dotlist(list(overrides)))

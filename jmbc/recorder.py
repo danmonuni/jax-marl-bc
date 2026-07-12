@@ -104,6 +104,22 @@ def load_rollouts(run_dir):
     return recs, idxs, env_steps
 
 
+def device_report(requested: str) -> str:
+    """One-line banner of the device JAX *actually* resolved.
+
+    Import jax lazily: this must run after setup_device() pinned the platform.
+    Catches the classic Colab failure of silently falling back to CPU.
+    """
+    import jax
+    devs = jax.devices()
+    kinds = ", ".join(sorted({f"{d.platform}:{d.device_kind}" for d in devs}))
+    line = (f"[device] requested={requested} -> backend={jax.default_backend()} "
+            f"({len(devs)} device(s): {kinds})")
+    if requested in ("gpu", "cuda") and jax.default_backend() == "cpu":
+        line += "  ** WARNING: GPU requested but JAX resolved CPU **"
+    return line
+
+
 # ── timing helpers ────────────────────────────────────────────────────────────
 
 def _total_env_steps(train_fn) -> int:

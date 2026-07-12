@@ -27,14 +27,17 @@ pip install -r requirements.txt   # uses jax[cuda12]
 
 ```bash
 python -m jmbc.run exp=rbc                       # textbook + typical RBC
-python -m jmbc.run exp=ks                         # Krusell-Smith
+python -m jmbc.run exp=ks                         # Krusell-Smith (full budget, Colab)
+python -m jmbc.run exp=ks_local                   # same KS economy, ~5 min on CPU
 python -m jmbc.run exp=general                    # heterogeneous RBC grid
 
 # Override anything via OmegaConf dotlist:
 python -m jmbc.run exp=ks env.n_agents=1000 train.num_envs=64 run.device=gpu
 ```
 
-`exp=<name>` selects `configs/exp/<name>.yaml`. The device (`run.device`:
+`exp=<name>` selects `configs/exp/<name>.yaml`; an exp file may declare
+`extends: <other>` to inherit it and override only what differs (`ks_local`
+is `ks` with a 5-minute training budget). The device (`run.device`:
 `auto` | `cpu` | `gpu`) is resolved *before* JAX is imported; `auto` picks the
 GPU on Colab and CPU otherwise.
 

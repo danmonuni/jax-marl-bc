@@ -58,8 +58,10 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
 
     from .experiments.common import run_single
     from .plots import make_benchmark_figures
-    from .recorder import RunRecorder
+    from .recorder import RunRecorder, device_report
     import pandas as pd
+
+    print(device_report(base_cfg.run.device))
 
     axes = OmegaConf.to_container(scfg.axes, resolve=True) or {}
     keys = list(axes)

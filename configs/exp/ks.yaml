@@ -15,6 +15,8 @@ train:
   total_timesteps: 500000   # sequential steps (x num_envs=20 -> 10M transitions)
   num_minibatches: 20
   ent_coef: 0.0
+  anneal_lr: true   # keeps approx_kl in check once the policy goes near-deterministic
+                    # (ks-local-01 hit KL~0.05 late in training at fixed lr)
 
 diag:
   n_snapshots: 12   # resolution of the training-evolution figures (heatmap etc.)

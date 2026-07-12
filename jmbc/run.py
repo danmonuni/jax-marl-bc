@@ -25,10 +25,11 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
 
     # Import jax-dependent code only after the device is fixed.
     from .experiments import get_driver
-    from .recorder import _timestamp
+    from .recorder import _timestamp, device_report
 
     run_id = cfg.log.run_name or _timestamp()
-    print(f"== jmbc.run exp={cfg.exp} run_id={run_id} device={cfg.run.device} ==")
+    print(f"== jmbc.run exp={cfg.exp} run_id={run_id} ==")
+    print(device_report(cfg.run.device))
     driver = get_driver(cfg.exp)
     driver(cfg, cfg.log.out_dir, run_id)
 

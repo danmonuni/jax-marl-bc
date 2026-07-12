@@ -1,0 +1,9 @@
+# Local semantic check: the SAME Krusell-Smith economy as ks.yaml, with a
+# training budget sized to finish in ~5 minutes on a laptop CPU. Use this to
+# iterate on diagnostics/figures locally; use exp=ks for the full run (Colab).
+extends: ks
+
+train:
+  total_timesteps: 60000    # 300 updates x ~0.7 s/update + compile + diagnostics
+                            # ~= 5 min on an 8-core laptop CPU (vs 500k for exp=ks)
+  log_every: 50
