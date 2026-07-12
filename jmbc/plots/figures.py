@@ -84,12 +84,13 @@ def plot_ks_fig4(recs, snap_idxs, snap_steps, max_steps, path):
         [fig.add_subplot(gs_right[0]), fig.add_subplot(gs_right[1])],
         [rec_before, rec_after], ["Untrained", "Trained"],
     ):
-        tail = slice(-2 * max_steps, None)
-        mask = np.ones(2 * max_steps, dtype=bool)
-        mask[max_steps - 1::max_steps] = False
-        W = rec["wealths"][tail][mask].flatten()
-        CF = rec["c_fracs"][tail][mask].flatten()
-        emp = rec["emp_states"][tail][mask].flatten()
+        T = rec["wealths"].shape[0]
+        tail = slice(-min(2 * max_steps, T), None)
+        W, CF, emp = rec["wealths"][tail], rec["c_fracs"][tail], rec["emp_states"][tail]
+        if "done" in rec:  # drop auto-reset steps (none in reset-free evals)
+            keep = ~np.asarray(rec["done"][tail]).astype(bool)
+            W, CF, emp = W[keep], CF[keep], emp[keep]
+        W, CF, emp = W.flatten(), CF.flatten(), emp.flatten()
         ax.scatter(W[emp == 1], CF[emp == 1], s=1, alpha=0.3, color="tab:orange", label="employed")
         ax.scatter(W[emp == 0], CF[emp == 0], s=1, alpha=0.3, color="tab:blue", label="unemployed")
         ax.set_title(label, fontsize=9)

@@ -27,6 +27,18 @@ def _timestamp() -> str:
     return datetime.now().strftime("%Y%m%d-%H%M%S")
 
 
+_T0 = time.perf_counter()
+
+
+def phase(msg: str) -> None:
+    """Host-side orchestration log line with elapsed wall time since import.
+
+    Used for everything OUTSIDE the compiled program (config, env build,
+    tracing, XLA compilation, diagnostics, IO) — zero effect on the XLA graph.
+    """
+    print(f"[jmbc +{time.perf_counter() - _T0:7.1f}s] {msg}", flush=True)
+
+
 def _jsonable(obj):
     """Recursively coerce numpy scalars/arrays to JSON-friendly types."""
     if isinstance(obj, dict):
@@ -133,20 +145,39 @@ def _total_env_steps(train_fn) -> int:
 def run_and_time(train_fn, rng) -> tuple:
     """Run once, blocking on the result. Returns (out, timing).
 
-    Wall time includes JIT compilation (matches the original scripts' report).
+    When the train fn exposes the AOT ``lower`` hook, the trace / XLA-compile /
+    run phases are timed and announced separately (all host-side; the compiled
+    program is identical). Total wall time still includes compilation.
     """
     import jax
     t0 = time.perf_counter()
-    out = train_fn(rng)
-    out = jax.block_until_ready(out)
-    wall = time.perf_counter() - t0
     steps = _total_env_steps(train_fn)
-    return out, {
-        "wall_time_s": wall,
-        "env_steps": steps,
-        "throughput_steps_per_s": (steps / wall) if wall > 0 else None,
-        "device": str(jax.devices()[0].platform),
-    }
+    timing = {"device": str(jax.devices()[0].platform)}
+
+    if hasattr(train_fn, "lower"):
+        phase("tracing train program (building the XLA graph) ...")
+        compile_ = train_fn.lower(rng)
+        t1 = time.perf_counter()
+        timing["trace_time_s"] = t1 - t0
+        phase(f"traced in {t1 - t0:.1f}s; XLA-compiling ...")
+        run = compile_()
+        t2 = time.perf_counter()
+        timing["compile_time_s"] = t2 - t1
+        phase(f"compiled in {t2 - t1:.1f}s; running "
+              f"({steps} sequential env steps) ...")
+        out = jax.block_until_ready(run())
+        t3 = time.perf_counter()
+        timing["run_time_s"] = t3 - t2
+        phase(f"training ran in {t3 - t2:.1f}s")
+    else:  # fallback: opaque compile+run (external train fns)
+        out = jax.block_until_ready(train_fn(rng))
+
+    wall = time.perf_counter() - t0
+    timing["wall_time_s"] = wall
+    timing["env_steps"] = steps
+    run_s = timing.get("run_time_s", wall)
+    timing["throughput_steps_per_s"] = (steps / run_s) if run_s > 0 else None
+    return out, timing
 
 
 def benchmark_time(train_fn, rng) -> tuple:

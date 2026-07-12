@@ -3,14 +3,14 @@
 
 env:
   alpha: 0.36
-  beta: 0.95
+  beta: 0.99
 
 train:
   num_envs: 20
   rollout_len: 200
   update_epochs: 10
   lr: 3.0e-4
-  gamma: 0.95
+  gamma: 0.99
   gae_lambda: 0.95
   clip_eps: 0.2
   vf_coef: 0.5

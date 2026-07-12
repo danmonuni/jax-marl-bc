@@ -15,7 +15,7 @@ from ..algos import make_train
 from ..config.schema import to_train_dict
 from ..diagnostics import compute_diagnostics, metrics_to_numpy
 from ..envs import build_env
-from ..recorder import RunRecorder, run_and_time, benchmark_time
+from ..recorder import RunRecorder, run_and_time, benchmark_time, phase
 
 
 def run_single(
@@ -29,9 +29,16 @@ def run_single(
     diag_seed: int = 7,
 ) -> dict:
     seed = int(cfg.run.seed) if seed is None else int(seed)
-    env = build_env(cfg.env) if env is None else env
+    if env is None:
+        env = build_env(cfg.env)
+        phase(f"env built: kind={cfg.env.kind} n_agents={env.num_agents} "
+              f"obs_dim={env.obs_dim} max_steps={env.max_steps}")
 
     train_fn = make_train(env, to_train_dict(cfg))
+    c = train_fn.config
+    phase(f"train fn built: {c['NUM_UPDATES']} updates x "
+          f"({c['ROLLOUT_LEN']} steps x {c['NUM_ENVS']} envs x {env.num_agents} agents), "
+          f"seed={seed}")
     rng = jax.random.PRNGKey(seed)
     timer = benchmark_time if benchmark else run_and_time
     out, timing = timer(train_fn, rng)
@@ -44,11 +51,15 @@ def run_single(
 
     summary, recs, idxs = None, None, None
     if do_diagnostics:
+        phase(f"diagnostics: {cfg.diag.n_snapshots} snapshots x "
+              f"{cfg.diag.sim_steps}-step reset-free eval rollouts ...")
         summary, recs, idxs = compute_diagnostics(
             env, cfg.env, net, out["params_history"], cfg.diag, diag_seed
         )
+        phase("diagnostics done")
 
     if recorder is not None:
+        phase(f"writing outputs -> {recorder.dir}")
         recorder.save_config(cfg)
         recorder.save_metrics(metrics_np)
         recorder.save_timing(timing)

@@ -59,9 +59,12 @@ def compute_diagnostics(
     idxs = snapshot_indices(num_updates, diag_cfg.n_snapshots)
     key = jax.random.PRNGKey(seed)
 
+    from ..recorder import phase
+
     recs: List[dict] = []
     snapshots: List[dict] = []
-    for idx in idxs:
+    for i, idx in enumerate(idxs):
+        phase(f"  snapshot {i + 1}/{len(idxs)} (update {int(idx) + 1}/{num_updates})")
         rec = simulate(env, net, params_at(params_history, int(idx)), key, diag_cfg.sim_steps)
         recs.append(rec)
         snap: Dict[str, object] = {"update_idx": int(idx)}

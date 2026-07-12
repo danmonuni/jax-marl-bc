@@ -295,12 +295,32 @@ def make_train(env: MultiAgentEnv, config: dict):
             "params_history": params_history,
         }
 
-    def train(rng):
+    def _prep(rng):
         rng, init_rng = jax.random.split(rng)
-        network_params = network.init(init_rng, init_x)
+        return rng, network.init(init_rng, init_x)
+
+    def train(rng):
+        rng, network_params = _prep(rng)
         return _train_core(rng, network_params)
+
+    def lower(rng):
+        """AOT: trace/lower now, compile explicitly, run later.
+
+        Same rng split as ``train`` -> identical results; lets the caller time
+        and announce the trace / XLA-compile / run phases separately from the
+        host, with no change to the compiled program itself.
+        """
+        rng, network_params = _prep(rng)
+        lowered = _train_core.lower(rng, network_params)
+
+        def compile_():
+            compiled = lowered.compile()
+            return lambda: compiled(rng, network_params)
+
+        return compile_
 
     # Expose derived config for callers (e.g. recorder, plotting axes).
     train.config = config
     train.network = network
+    train.lower = lower
     return train
