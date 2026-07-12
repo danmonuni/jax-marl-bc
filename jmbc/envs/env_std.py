@@ -52,8 +52,10 @@ class RBCKLEnv(MultiAgentEnv):
         self.action_spaces      = {a: Box(-0.99, 0.99, (self.act_dim,))
                                    for a in self.agents}
 
+    # ── vector (array) interface: fast path for large n_agents ──────────────
+
     @partial(jax.jit, static_argnums=(0,))
-    def reset(self, key):
+    def reset_mat(self, key):
         key, sk = jax.random.split(key)
         ks  = jnp.full((self.num_agents,), self.k_init, jnp.float32)
         z   = jnp.zeros((), jnp.float32)
@@ -63,7 +65,24 @@ class RBCKLEnv(MultiAgentEnv):
                            ks=ks, z=z, A=jnp.exp(z), wealths=w,
                            incomes=jnp.zeros(self.num_agents, jnp.float32),
                            ls=ls, key=sk)
-        return self.get_obs(state), state
+        return self._obs_matrix(state), state
+
+    @partial(jax.jit, static_argnums=(0,))
+    def step_mat(self, key, state: RBCKLState, acts):
+        """Auto-resetting step on arrays; mirrors MultiAgentEnv.step()."""
+        key, key_reset = jax.random.split(key)
+        obs_st, st_st, rews, done = self._step_core(key, state, acts)
+        obs_re, st_re = self.reset_mat(key_reset)
+        st = jax.tree.map(lambda x, y: lax.select(done, x, y), st_re, st_st)
+        obs = lax.select(done, obs_re, obs_st)
+        return obs, st, rews, done
+
+    # ── JaxMARL dict interface ───────────────────────────────────────────────
+
+    @partial(jax.jit, static_argnums=(0,))
+    def reset(self, key):
+        obs_mat, state = self.reset_mat(key)
+        return {a: obs_mat[i] for i, a in enumerate(self.agents)}, state
 
     @partial(jax.jit, static_argnums=(0,))
     def get_obs(self, state: RBCKLState) -> Dict[str, chex.Array]:
@@ -75,7 +94,16 @@ class RBCKLEnv(MultiAgentEnv):
     def step_env(self, key, state: RBCKLState,
                  actions: Dict[str, chex.Array]):
         """Economic transition. Base class step() wraps this with auto-reset."""
-        acts    = jnp.stack([actions[a] for a in self.agents])  # [n, 2]
+        acts = jnp.stack([actions[a] for a in self.agents])  # [n, 2]
+        obs_mat, new_state, rews, done = self._step_core(key, state, acts)
+        obs    = {a: obs_mat[i] for i, a in enumerate(self.agents)}
+        rews_d = {a: rews[i]  for i, a in enumerate(self.agents)}
+        dones  = {a: done     for a in self.agents}
+        dones["__all__"] = done
+        return obs, new_state, rews_d, dones, {}
+
+    def _step_core(self, key, state: RBCKLState, acts):
+        """Economic transition on arrays (env carries its own RNG in state.key)."""
         c_fracs = jnp.clip((acts[:,0]+1)/2, 0.01, 0.99)
         ls      = jnp.clip((acts[:,1]+1)/2, 0.01, 0.99)
 
@@ -96,10 +124,7 @@ class RBCKLEnv(MultiAgentEnv):
         new_state = RBCKLState(done=done, step=step_new,
                                ks=ks_new, z=z_new, A=jnp.exp(z_new),
                                wealths=w, incomes=ws*ls+rs*state.ks, ls=ls, key=key)
-        rews_d = {a: rews[i]  for i, a in enumerate(self.agents)}
-        dones  = {a: done     for a in self.agents}
-        dones["__all__"] = done
-        return self.get_obs(new_state), new_state, rews_d, dones, {}
+        return self._obs_matrix(new_state), new_state, rews, done
 
     def _obs_matrix(self, state):
         n, parts = self.num_agents, []

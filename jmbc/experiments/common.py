@@ -18,6 +18,47 @@ from ..envs import build_env
 from ..recorder import RunRecorder, run_and_time, benchmark_time, phase
 
 
+def _print_launch_summary(cfg, env, train_fn, seed: int) -> None:
+    """What is ACTUALLY about to run: values pulled from the built env, the
+    derived training config and the initialized network — not the YAML."""
+    import jax
+    import numpy as np
+
+    c = train_fn.config
+    E, R, n = c["NUM_ENVS"], c["ROLLOUT_LEN"], env.num_agents
+    seq_steps = c["NUM_UPDATES"] * R
+    params = train_fn.network.init(
+        jax.random.PRNGKey(0), jax.numpy.zeros((env.obs_dim,)))
+    n_params = sum(int(np.prod(p.shape)) for p in jax.tree_util.tree_leaves(params))
+    lr = f"{c['LR']:g}" + (" (annealed)" if c.get("ANNEAL_LR") else " (constant)")
+    iface = "vector [n,d] arrays" if c.get("VEC_INTERFACE") else "jaxmarl per-agent dicts"
+
+    rows = [
+        ("economy", f"{cfg.env.kind} | {n} agents | obs[{env.obs_dim}]: "
+                    f"{', '.join(env.obs_vars)}"),
+        ("",        f"alpha {cfg.env.alpha} | beta {cfg.env.beta} | delta {cfg.env.delta}"
+                    f" | episode {env.max_steps} steps | k_init {cfg.env.k_init}"),
+        ("training", f"{c['NUM_UPDATES']:,} updates = {seq_steps:,} sequential steps"
+                     f" | {E} envs x {n} agents -> {seq_steps * E * n:,} transitions"),
+        ("",         f"batch/update {R * E * n:,} | minibatch {c['MINIBATCH_SIZE']:,}"
+                     f" x {c['NUM_MINIBATCHES']} | {c['UPDATE_EPOCHS']} epochs"
+                     f" | actors {c['NUM_ACTORS']:,}"),
+        ("",         f"lr {lr} | gamma {c['GAMMA']} | clip {c['CLIP_EPS']}"
+                     f" | ent {c['ENT_COEF']} | vf {c['VF_COEF']}"),
+        ("network",  f"hidden {list(c['HIDDEN_DIMS'])} {c['ACTIVATION']}"
+                     f" | {n_params:,} params | interface: {iface}"),
+        ("diag",     f"{cfg.diag.n_snapshots} snapshots x {cfg.diag.sim_steps:,}"
+                     f" eval steps (reset-free) | burn_frac {cfg.diag.burn_frac}"),
+        ("run",      f"seed {seed} | backend {jax.default_backend()}"
+                     f" | heartbeat every {c.get('LOG_EVERY', 0)} updates"),
+    ]
+    width = 74
+    print("┌─ launch " + "─" * (width - 9))
+    for label, text in rows:
+        print(f"│ {label:<9}{text}")
+    print("└" + "─" * width)
+
+
 def run_single(
     cfg,
     env=None,
@@ -31,14 +72,9 @@ def run_single(
     seed = int(cfg.run.seed) if seed is None else int(seed)
     if env is None:
         env = build_env(cfg.env)
-        phase(f"env built: kind={cfg.env.kind} n_agents={env.num_agents} "
-              f"obs_dim={env.obs_dim} max_steps={env.max_steps}")
 
     train_fn = make_train(env, to_train_dict(cfg))
-    c = train_fn.config
-    phase(f"train fn built: {c['NUM_UPDATES']} updates x "
-          f"({c['ROLLOUT_LEN']} steps x {c['NUM_ENVS']} envs x {env.num_agents} agents), "
-          f"seed={seed}")
+    _print_launch_summary(cfg, env, train_fn, seed)
     rng = jax.random.PRNGKey(seed)
     timer = benchmark_time if benchmark else run_and_time
     out, timing = timer(train_fn, rng)

@@ -16,16 +16,24 @@ import numpy as np
 
 
 def _simulate_jax(env, net, params, key, n_steps=2000):
-    """Pure-JAX deterministic rollout returning JAX arrays (vmap-composable)."""
-    obs, state = env.reset(key)
+    """Pure-JAX deterministic rollout returning JAX arrays (vmap-composable).
+
+    Uses the array interface (reset_mat/step_mat) when the env provides it, so
+    trace size stays independent of n_agents; falls back to the dict API.
+    """
+    use_vec = hasattr(env, "step_mat")
+    if use_vec:
+        obs_mat0, state = env.reset_mat(key)
+    else:
+        obs0, state = env.reset(key)
+        obs_mat0 = jnp.stack([obs0[a] for a in env.agents])
     alpha, delta = env.alpha, env.delta
     kappas, lambdas = env.kappas, env.lambdas
     # Column of the capital observation, for the finite-difference MPC probe.
     cap_col = env.obs_vars.index("capital") if "capital" in env.obs_vars else None
 
     def _step(carry, _):
-        obs, state, key = carry
-        obs_mat = jnp.stack([obs[a] for a in env.agents])
+        obs_mat, state, key = carry
         pi, _ = net.apply(params, obs_mat)
         mu = pi.loc  # [n_agents, act_dim]
 
@@ -55,11 +63,16 @@ def _simulate_jax(env, net, params, key, n_steps=2000):
             c_frac_p = jnp.clip((pi_p.loc[:, 0] + 1) / 2, 0.01, 0.99)
             dw = R_i * eps
 
-        acts = {a: mu[i] for i, a in enumerate(env.agents)}
         key, sk = jax.random.split(key)
-        obs, state, rews, dones, _ = env.step(sk, state, acts)
+        if use_vec:
+            obs_mat_n, state, rew_arr, done = env.step_mat(sk, state, mu)
+        else:
+            acts = {a: mu[i] for i, a in enumerate(env.agents)}
+            obs_d, state, rews, dones, _ = env.step(sk, state, acts)
+            obs_mat_n = jnp.stack([obs_d[a] for a in env.agents])
+            rew_arr = jnp.stack([rews[a] for a in env.agents])
+            done = dones["__all__"]
 
-        rew_arr = jnp.stack([rews[a] for a in env.agents])
         cons = c_frac * state.wealths  # c_t = c_frac * a_t
         if cap_col is not None:
             mpc = (c_frac_p * (state.wealths + dw) - cons) / dw
@@ -79,13 +92,13 @@ def _simulate_jax(env, net, params, key, n_steps=2000):
             "reward": jnp.mean(rew_arr),
             # True on an auto-reset step: the recorded state is a fresh reset,
             # so economic accounting probes must skip it.
-            "done": dones["__all__"],
+            "done": done,
             "emp_states": getattr(state, "emp_states", jnp.ones(env.num_agents, jnp.int32)),
             "agg_state": getattr(state, "agg_state", jnp.array(1, jnp.int32)),
         }
-        return (obs, state, key), record
+        return (obs_mat_n, state, key), record
 
-    _, rec = jax.lax.scan(_step, (obs, state, key), None, length=n_steps)
+    _, rec = jax.lax.scan(_step, (obs_mat0, state, key), None, length=n_steps)
     return rec
 
 

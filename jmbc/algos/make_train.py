@@ -16,6 +16,7 @@ from typing import NamedTuple, Dict, Any
 
 from jaxmarl.environments.multi_agent_env import MultiAgentEnv
 from jaxmarl.wrappers.baselines import LogWrapper
+from ..envs.vec import VecLogWrapper
 from .nn import ActorCritic
 
 
@@ -52,7 +53,13 @@ def make_train(env: MultiAgentEnv, config: dict):
         config["NUM_ACTORS"] * config["ROLLOUT_LEN"] // config["NUM_MINIBATCHES"]
     )
 
-    env = LogWrapper(env)
+    # Vector fast path: when the env exposes the array interface, skip the
+    # per-agent dict round-trip entirely (trace size / runtime independent of
+    # n_agents). Dynamics and RNG stream are identical to the dict path.
+    use_vec = hasattr(env, "step_mat")
+    config["VEC_INTERFACE"] = use_vec
+    n_agents = env.num_agents
+    env = VecLogWrapper(env) if use_vec else LogWrapper(env)
 
     act_dim = env.action_space(env.agents[0]).shape[0]
     network = ActorCritic(
@@ -97,7 +104,10 @@ def make_train(env: MultiAgentEnv, config: dict):
             def _env_step(carry, _):
                 train_state, env_state, last_obs, rng = carry
 
-                obs_batch = batchify(last_obs, env.agents, config["NUM_ENVS"], env.num_agents)
+                if use_vec:
+                    obs_batch = last_obs                      # [E, n, d] already
+                else:
+                    obs_batch = batchify(last_obs, env.agents, config["NUM_ENVS"], n_agents)
                 obs_flat = obs_batch.reshape((config["NUM_ACTORS"], -1))
 
                 rng, _rng = jax.random.split(rng)
@@ -105,21 +115,31 @@ def make_train(env: MultiAgentEnv, config: dict):
                 action = pi.sample(seed=_rng)
                 log_prob = pi.log_prob(action)
 
-                action_reshaped = action.reshape((config["NUM_ENVS"], env.num_agents, -1))
-                env_act = unbatchify(action_reshaped, env.agents, config["NUM_ENVS"], env.num_agents)
+                action_reshaped = action.reshape((config["NUM_ENVS"], n_agents, -1))
 
                 rng, _rng = jax.random.split(rng)
                 rng_step = jax.random.split(_rng, config["NUM_ENVS"])
-                obsv, env_state, reward, done, info = jax.vmap(env.step)(
-                    rng_step, env_state, env_act,
-                )
+                if use_vec:
+                    obsv, env_state, reward_b, done_env, info = jax.vmap(env.step)(
+                        rng_step, env_state, action_reshaped,
+                    )
+                    done_b = jnp.broadcast_to(
+                        done_env[:, None], (config["NUM_ENVS"], n_agents)
+                    )
+                else:
+                    env_act = unbatchify(action_reshaped, env.agents, config["NUM_ENVS"], n_agents)
+                    obsv, env_state, reward, done, info = jax.vmap(env.step)(
+                        rng_step, env_state, env_act,
+                    )
+                    reward_b = batchify(reward, env.agents, config["NUM_ENVS"], n_agents)
+                    done_b = batchify(done, env.agents, config["NUM_ENVS"], n_agents)
 
                 transition = Transition(
-                    done=batchify(done, env.agents, config["NUM_ENVS"], env.num_agents),
-                    action=action.reshape((config["NUM_ENVS"], env.num_agents, -1)),
-                    value=value.reshape((config["NUM_ENVS"], env.num_agents)),
-                    reward=batchify(reward, env.agents, config["NUM_ENVS"], env.num_agents),
-                    log_prob=log_prob.reshape((config["NUM_ENVS"], env.num_agents)),
+                    done=done_b,
+                    action=action_reshaped,
+                    value=value.reshape((config["NUM_ENVS"], n_agents)),
+                    reward=reward_b,
+                    log_prob=log_prob.reshape((config["NUM_ENVS"], n_agents)),
                     obs=obs_batch,
                     info=info,
                 )
@@ -131,10 +151,11 @@ def make_train(env: MultiAgentEnv, config: dict):
 
             # 3.2 ADVANTAGE (GAE)
             train_state, env_state, last_obs, rng = runner_state
-            last_obs_batch = batchify(last_obs, env.agents, config["NUM_ENVS"], env.num_agents)
+            last_obs_batch = (last_obs if use_vec else
+                              batchify(last_obs, env.agents, config["NUM_ENVS"], n_agents))
             last_obs_flat = last_obs_batch.reshape((config["NUM_ACTORS"], -1))
             _, last_val = network.apply(train_state.params, last_obs_flat)
-            last_val_reshaped = last_val.reshape((config["NUM_ENVS"], env.num_agents))
+            last_val_reshaped = last_val.reshape((config["NUM_ENVS"], n_agents))
 
             def _calculate_gae(traj_batch, last_val):
                 def _get_advantages(gae_and_next_value, transition):
