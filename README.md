@@ -108,8 +108,8 @@ overrides:
 repeats: 1
 paired: false               # true -> zip equal-length axes instead of the
                             # Cartesian product (e.g. a constant-product cut)
-benchmark: true             # run each cell twice (compile/run split);
-                            # false -> one timed run (AOT phase split)
+benchmark: false            # one timed run/cell; the AOT phase timer already
+                            # splits compile from run (true = double-run split)
 collect_diagnostics: true   # also tabulate Euler / Gini per cell
 save_cell_runs: false       # true -> full per-cell run dir + figures
                             # (wealth distribution, Euler panel, training health)

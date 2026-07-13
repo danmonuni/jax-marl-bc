@@ -228,8 +228,9 @@ def make_benchmark_figures(df, axes, out_dir: str, group_col: str = "method") ->
             plot_metric_vs(df, col, "throughput_steps_per_s", p, group_col,
                            ylabel="env steps / s", title=f"Throughput vs {col}")
             paths.append(p)
-        time_col = "run_only_s" if "run_only_s" in df.columns else "wall_time_s"
-        if time_col in df.columns:
+        time_col = next((c for c in ("time_s",) + TIME_COLS if c in df.columns),
+                        None)
+        if time_col:
             p = str(out / f"walltime_vs_{col}.png")
             plot_metric_vs(df, col, time_col, p, group_col,
                            ylabel="seconds", title=f"Wall time vs {col}")

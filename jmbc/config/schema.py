@@ -142,8 +142,10 @@ class SweepConfig:
     save_cell_runs: bool = False       # full per-cell output dir + figures
                                        # (distributional/economic/training health)
     paired: bool = False               # zip axes instead of Cartesian product
-    benchmark: bool = True             # run each cell twice (compile/run split);
-                                       # False = one timed run (AOT phase split)
+    # One timed run per cell: the AOT phase timer already separates trace /
+    # XLA-compile / run, so time_s is steady-state without training twice.
+    # True = legacy double-run split (second full run measures run_only_s).
+    benchmark: bool = False
     figures: List[str] = field(default_factory=lambda: ["auto"])
     # CSV of baseline timings (``method``, ``n_agents``, ``time_hours`` or
     # ``time_s`` columns) overlaid on time figures and used as the numerator

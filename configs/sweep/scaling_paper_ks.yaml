@@ -23,7 +23,5 @@ overrides:
 
 repeats: 1
 collect_diagnostics: false
-benchmark: false                 # one timed run; compile split out by the AOT
-                                 # phase timer, so time_s is steady-state only
 figures: [walltime, throughput, speedup]
 reference_csv: configs/reference/marlbc_ks_fig8_cpu.csv
