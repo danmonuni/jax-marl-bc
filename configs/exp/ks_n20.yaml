@@ -1,25 +1,12 @@
-# KS population-scaling cell: n = 20 — equal-learning protocol.
+# KS population-scaling cell: n = 20.
 #
-# One of three cells (ks_n20 / ks_n200 / ks_n2000) designed so that ONLY the
-# population differs and every run undergoes the same amount of learning
-# (complexity-report.md §9.7). Held identical across cells:
-#
-#   optimizer trajectory — U = 2000 updates x (K=4 epochs x M=4 minibatches)
-#     = 32,000 gradient steps, same annealed-LR schedule, same clip/gamma/
-#     gae_lambda, and same seed: the network shape is n-independent, so
-#     seed 0 gives bit-identical initial parameters theta_0 in all cells;
-#   per-update aggregate information — E = 32 envs x T = 64 steps, so
-#     I_agg = E*T/tau ~ 293 independent business-cycle observations per
-#     update in every cell (the dominant gradient-noise term, n-independent);
-#   evaluation population — diag.n_agents = 2000: every cell's policy is
-#     evaluated on the SAME 2000-agent economy, separating "what was
-#     learned" from "what is simulated".
-#
-# What necessarily differs with n (report the difference, don't hide it):
-# minibatch size b = 64*32*n/4 (idiosyncratic gradient noise ~ 1/(E*T*n)),
-# and the finite-n game itself (aggregate sampling noise ~ 1/sqrt(n)).
-# Verify parity ex post: approx_kl / entropy / explained_variance vs update
-# index should superpose across cells.
+# Spec copied from the reference run `runs/ks/top` (its resolved config.yaml):
+# identical across the three cells (ks_n20 / ks_n200 / ks_n2000) in every
+# hyperparameter — optimizer trajectory (640 updates x 4 epochs x 64
+# minibatches, annealed LR, seed 0 -> bit-identical theta_0), per-update data
+# (E=32 envs x T=200 steps), env parameters (beta=0.95, max_steps=5000) — so
+# ONLY the population n differs. The diagnostic simulation runs at the SAME
+# population the policy was trained on (diag.n_agents = env.n_agents).
 extends: ks
 
 env:
@@ -28,18 +15,21 @@ env:
 train:
   num_envs: 32
   rollout_len: 200
-  total_timesteps: 128000   # = 2000 updates x 64 sequential steps
+  total_timesteps: 128000   # sequential steps = 640 updates x 200
   update_epochs: 4
   num_minibatches: 64
   log_every: 100
 
 diag:
-  n_agents: 20            # common evaluation population for all cells
+  n_snapshots: 12
+  sim_steps: 5000
+  n_agents: 20              # eval population = training population
 
 log:
-  save_agents: 200          # eval runs at n=2000 in every cell; cap raw dump
+  run_name: ks_n20
+  save_agents: 200
 
 run:
+  seed: 0
   device: gpu
   prealloc: true
-  seed: 0                   # same theta_0 in all cells (n-independent init)

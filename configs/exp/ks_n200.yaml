@@ -1,9 +1,7 @@
-# KS population-scaling cell: n = 200 — equal-learning protocol.
-# See ks_n20.yaml for the full protocol rationale (complexity-report.md §9.7):
-# all cells share the optimizer trajectory (2000 updates x 16 gradient steps,
-# same LR schedule, same seed -> identical theta_0), the per-update aggregate
-# information (E=32, T=64 -> I_agg ~ 293), and the evaluation population
-# (diag.n_agents=2000). Only the trained population n differs.
+# KS population-scaling cell: n = 200.
+# Spec copied from the reference run `runs/ks/top` — see ks_n20.yaml for the
+# protocol. Only the population differs across cells; the diagnostic
+# simulation runs at the training population (diag.n_agents = env.n_agents).
 extends: ks
 
 env:
@@ -12,18 +10,21 @@ env:
 train:
   num_envs: 32
   rollout_len: 200
-  total_timesteps: 128000   # = 2000 updates x 64 sequential steps
+  total_timesteps: 128000   # sequential steps = 640 updates x 200
   update_epochs: 4
   num_minibatches: 64
   log_every: 100
 
 diag:
-  n_agents: 200           # common evaluation population for all cells
+  n_snapshots: 12
+  sim_steps: 5000
+  n_agents: 200             # eval population = training population
 
 log:
+  run_name: ks_n200
   save_agents: 200
 
 run:
+  seed: 0
   device: gpu
   prealloc: true
-  seed: 0

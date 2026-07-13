@@ -5,7 +5,7 @@ env:
   kind: ks
   n_agents: 20
   delta: 0.025
-  max_steps: 200
+  max_steps: 5000
   k_init: 1.0
   # `labour` = own employment status x productivity: without it the policy
   # cannot condition consumption on being unemployed (no precautionary motive).

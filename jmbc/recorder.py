@@ -125,7 +125,14 @@ def load_rollouts(run_dir):
         env_steps = z["snap_env_steps"]
         keys = [k for k in z.files
                 if not k.startswith("snap_") and k != "saved_agents"]
-        recs = [{k: z[k][s] for k in keys} for s in range(len(idxs))]
+        recs = [{} for _ in range(len(idxs))]
+        # Decompress each channel once; .copy() so no slice pins the full
+        # stacked array (a view would keep every channel's whole buffer alive,
+        # blowing memory as snapshots x file size).
+        for k in keys:
+            a = z[k]
+            for s in range(len(idxs)):
+                recs[s][k] = a[s].copy()
     return recs, idxs, env_steps
 
 
