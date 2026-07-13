@@ -2,11 +2,14 @@
 
     python -m jmbc.sweep sweep=scaling
 
-Evaluates the Cartesian product of ``axes`` for a base experiment, timing each
-cell (compile vs run split, throughput) and optionally tabulating end-of-run
-diagnostics. Writes ``benchmarks/<name>/results.csv`` plus scaling figures.
-A ``method`` column is included so the original implementation can be appended
-later and overlaid as "standard vs JaxMARL-BC".
+Evaluates the Cartesian product of ``axes`` (or their zip, with ``paired``)
+for a base experiment, timing each cell (compile vs run split, throughput) and
+optionally tabulating end-of-run diagnostics. Writes
+``benchmarks/<name>/{results.csv,sweep.yaml}`` plus the figures selected by
+the sweep's ``figures`` list (walltime / throughput / speedup / phase /
+tradeoff — see :func:`jmbc.plots.make_sweep_figures`). A ``method`` column is
+included, and ``reference_csv`` timings (e.g. the original implementation's
+digitized CPU times) are overlaid as extra methods and used for speedups.
 """
 from __future__ import annotations
 
@@ -22,6 +25,40 @@ from .config import load_config, load_sweep, parse_cli, setup_device
 
 def _overrides_to_dotlist(d: Dict) -> List[str]:
     return [f"{k}={v}" for k, v in d.items()]
+
+
+def build_combos(axes: Dict[str, List], paired: bool = False) -> List[tuple]:
+    """Cells to evaluate: Cartesian product of the axes, or — ``paired`` —
+    the zip of equal-length axes (e.g. a constant n_agents*num_envs cut)."""
+    keys = list(axes)
+    value_lists = [axes[k] for k in keys]
+    if not keys:
+        return [()]
+    if paired:
+        lengths = {len(v) for v in value_lists}
+        if len(lengths) > 1:
+            raise ValueError(
+                f"paired sweep needs equal-length axes, got "
+                f"{ {k: len(v) for k, v in axes.items()} }")
+        return list(zip(*value_lists))
+    return list(itertools.product(*value_lists))
+
+
+def load_reference(path_str: str):
+    """Baseline timing table (``method`` + ``time_hours``/``time_s`` columns).
+
+    Relative paths resolve against the CWD first, then the repo root, so the
+    same sweep YAML works from Colab checkouts and local shells alike.
+    """
+    import pandas as pd
+    from .config.loader import CONFIG_ROOT
+
+    p = Path(path_str)
+    if not p.exists():
+        p = CONFIG_ROOT.parent / path_str
+    if not p.exists():
+        raise FileNotFoundError(f"reference_csv not found: {path_str}")
+    return pd.read_csv(p, comment="#")
 
 
 def _extract_diag_scalars(summary) -> Dict[str, float]:
@@ -57,7 +94,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
     setup_device(base_cfg.run.device, bool(base_cfg.run.prealloc))
 
     from .experiments.common import run_single
-    from .plots import make_benchmark_figures
+    from .plots import ensure_time_column, make_sweep_figures
     from .recorder import RunRecorder, device_report
     import pandas as pd
 
@@ -65,11 +102,11 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
 
     axes = OmegaConf.to_container(scfg.axes, resolve=True) or {}
     keys = list(axes)
-    value_lists = [axes[k] for k in keys]
-    combos = list(itertools.product(*value_lists)) if keys else [()]
+    combos = build_combos(axes, paired=bool(scfg.paired))
 
     out_dir = Path("benchmarks") / scfg.name
     out_dir.mkdir(parents=True, exist_ok=True)
+    OmegaConf.save(scfg, out_dir / "sweep.yaml")
 
     rows: List[dict] = []
     total = len(combos) * scfg.repeats
@@ -92,7 +129,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
                 seed=int(cfg.run.seed) + rep,
                 do_diagnostics=bool(scfg.collect_diagnostics),
                 do_figures=bool(scfg.save_cell_runs),
-                benchmark=True,
+                benchmark=bool(scfg.benchmark),
             )
             row = {"method": "jaxmarl-bc", "base_exp": scfg.base_exp, "repeat": rep}
             for k, v in zip(keys, combo):
@@ -104,16 +141,27 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
             row.update(_extract_diag_scalars(res["summary"]))
             rows.append(row)
             t = res["timing"]
-            print(f"    run={t.get('run_only_s', t.get('wall_time_s')):.2f}s "
+            run_s = t.get("run_only_s", t.get("run_time_s", t.get("wall_time_s")))
+            print(f"    run={run_s:.2f}s "
                   f"throughput={t.get('throughput_steps_per_s', 0):.3e} steps/s "
                   f"device={t.get('device')}")
 
-    df = pd.DataFrame(rows)
+    df = ensure_time_column(pd.DataFrame(rows))
     csv_path = out_dir / "results.csv"
     df.to_csv(csv_path, index=False)
     print(f"\nWrote {csv_path}  ({len(df)} rows)")
 
-    figs = make_benchmark_figures(df, axes, str(out_dir))
+    if scfg.reference_csv:
+        ref = load_reference(str(scfg.reference_csv))
+        print(f"overlaying reference timings: {scfg.reference_csv} "
+              f"({ref['method'].nunique()} method(s))")
+        df = pd.concat([df, ref], ignore_index=True)
+
+    figs = make_sweep_figures(
+        df, axes, str(out_dir), figures=list(scfg.figures),
+        tradeoff_product=(int(scfg.tradeoff_product)
+                          if scfg.tradeoff_product else None),
+    )
     for p in figs:
         print(f"  figure -> {p}")
 

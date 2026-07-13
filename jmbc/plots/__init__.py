@@ -10,7 +10,15 @@ from .ks_semantics import (
     plot_ks_wealth_heatmap,
     render_ks_figures,
 )
-from .benchmark import plot_metric_vs, make_benchmark_figures
+from .benchmark import (
+    plot_metric_vs,
+    plot_speedup,
+    plot_phase_diagram,
+    plot_tradeoff,
+    make_benchmark_figures,
+    make_sweep_figures,
+    ensure_time_column,
+)
 
 __all__ = [
     "apply_style",
@@ -26,5 +34,10 @@ __all__ = [
     "plot_ks_wealth_heatmap",
     "render_ks_figures",
     "plot_metric_vs",
+    "plot_speedup",
+    "plot_phase_diagram",
+    "plot_tradeoff",
     "make_benchmark_figures",
+    "make_sweep_figures",
+    "ensure_time_column",
 ]

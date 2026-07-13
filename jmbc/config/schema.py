@@ -123,8 +123,14 @@ class SweepConfig:
     """A meta-experiment: a base experiment plus axes to sweep over.
 
     ``axes`` maps dotted config paths (e.g. ``env.n_agents``) to lists of
-    values. The runner evaluates the Cartesian product. ``overrides`` are
-    applied to every cell before the axis values.
+    values. The runner evaluates the Cartesian product (or, with ``paired``,
+    zips equal-length axes into a single trajectory of cells, e.g. a
+    constant-product agents/envs tradeoff). ``overrides`` are applied to
+    every cell before the axis values.
+
+    ``figures`` selects which benchmark graphs are rendered from the timing
+    table (see :func:`jmbc.plots.make_sweep_figures`):
+    "auto" | "walltime" | "throughput" | "speedup" | "phase" | "tradeoff".
     """
 
     base_exp: str = "rbc"
@@ -135,6 +141,16 @@ class SweepConfig:
     collect_diagnostics: bool = True   # also tabulate Euler/Gini per cell
     save_cell_runs: bool = False       # full per-cell output dir + figures
                                        # (distributional/economic/training health)
+    paired: bool = False               # zip axes instead of Cartesian product
+    benchmark: bool = True             # run each cell twice (compile/run split);
+                                       # False = one timed run (AOT phase split)
+    figures: List[str] = field(default_factory=lambda: ["auto"])
+    # CSV of baseline timings (``method``, ``n_agents``, ``time_hours`` or
+    # ``time_s`` columns) overlaid on time figures and used as the numerator
+    # of the "speedup" figure. Path is relative to the repo root.
+    reference_csv: Optional[str] = None
+    # n_agents * num_envs product along which the "tradeoff" figure slices.
+    tradeoff_product: Optional[int] = None
 
 
 def to_train_dict(cfg: ExperimentConfig) -> dict:

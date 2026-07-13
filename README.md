@@ -79,15 +79,21 @@ directory, then iterate on diagnostics/figures locally against the saved data.
 ## Sweep / benchmark
 
 ```bash
-python -m jmbc.sweep sweep=scaling          # n_agents x num_envs scaling
-python -m jmbc.sweep sweep=scaling_smoke     # quick end-to-end check
+python -m jmbc.sweep sweep=scaling            # n_agents x num_envs scaling
+python -m jmbc.sweep sweep=scaling_smoke      # quick end-to-end check
+# the three headline scaling studies (Colab T4):
+python -m jmbc.sweep sweep=scaling_paper_ks   # KS, 1 env, matched budget vs the
+                                              # original paper's CPU times (Fig. 8)
+python -m jmbc.sweep sweep=scaling_phase      # agents x envs mesh -> phase diagram
+                                              # + constant-product-200 tradeoff cut
+python -m jmbc.sweep sweep=scaling_agents     # 5 envs, n_agents 1 -> 20000 (1-2-5)
 ```
 
-Writes `benchmarks/<name>/results.csv` (one row per cell, with a `method`
-column so the original implementation can be appended and overlaid as
-"standard vs JaxMARL-BC") and throughput / wall-time scaling figures. Timing
-separates JIT **compile time** from steady-state **run time** so throughput is
-measured fairly.
+Writes `benchmarks/<name>/{results.csv,sweep.yaml}` (one row per cell with all
+timings and a canonical `time_s` column; `method` distinguishes series) plus
+the figures selected by the sweep's `figures` list. Timing separates JIT
+**compile time** from steady-state **run time** so throughput is measured
+fairly.
 
 Define your own sweep in `configs/sweep/<name>.yaml`:
 
@@ -100,10 +106,21 @@ axes:
 overrides:
   train.total_timesteps: 50000   # sequential env steps, independent of num_envs
 repeats: 1
+paired: false               # true -> zip equal-length axes instead of the
+                            # Cartesian product (e.g. a constant-product cut)
+benchmark: true             # run each cell twice (compile/run split);
+                            # false -> one timed run (AOT phase split)
 collect_diagnostics: true   # also tabulate Euler / Gini per cell
 save_cell_runs: false       # true -> full per-cell run dir + figures
                             # (wealth distribution, Euler panel, training health)
                             # under benchmarks/<name>/cells/
+figures: [auto]             # which graphs to render from the timing table:
+                            # auto | walltime | throughput | speedup | phase | tradeoff
+tradeoff_product: null      # slice for "tradeoff": n_agents * num_envs == product
+reference_csv: null         # baseline timings (method, n_agents, time_hours|time_s)
+                            # overlaid on time figures & used by "speedup";
+                            # configs/reference/marlbc_ks_fig8_cpu.csv holds the
+                            # original paper's digitized single-CPU KS times
 ```
 
 ## Repository map
@@ -128,7 +145,7 @@ jmbc/                    HOW it runs
   plots/                   style, training health, KS semantic figures, benchmarks
   recorder.py              run directory writer (config/metrics/rollouts/timing)
 tests/                   env semantics, rollout, diagnostics checks
-notebooks/quickstart     Colab walkthrough
+notebooks/               Colab (T4) runners: KS population runs, scaling benchmarks
 paper.md                 the systems paper draft
 .sources/                reference PDFs + the original pre-refactor PPO script
 .archive/                superseded generated outputs (pre-env-fix results)
@@ -138,7 +155,16 @@ Data flow: `configs/` → `jmbc.run` → `runs/<exp>/<run_id>/` (complete record
 incl. `rollouts.npz`) → `jmbc.analyze` (iterate on figures/diagnostics ex post,
 no retraining).
 
-## Notebook
+## Notebooks (Colab T4 runners)
 
-`notebooks/quickstart.ipynb` walks through loading a config, training,
-inspecting diagnostics inline, and running a mini scaling sweep.
+Both mount Drive **before** running and sync every result to
+`MyDrive/jax-marl-bc-runs/` as soon as it finishes, so a disconnect loses at
+most the run in progress:
+
+- `notebooks/colab_train_ks_populations.ipynb` — the full KS training runs at
+  n = 20 / 200 / 2000 (equal-learning protocol) → `runs/ks/ks_n*`, analyzed
+  locally afterwards with `jmbc.analyze`.
+- `notebooks/colab_scaling_benchmarks.ipynb` — the three scaling sweeps
+  (`scaling_paper_ks`, `scaling_phase`, `scaling_agents`) →
+  `benchmarks/<name>/`, including the paper-comparison speedup and the
+  agents × envs phase diagram.

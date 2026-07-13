@@ -1,0 +1,24 @@
+# Population scaling at fixed parallelism: Krusell-Smith economy with 5
+# parallel environments, n_agents on a 1-2-5 progression up to 20000, fixed
+# sequential budget per cell. Shows how far the accelerator absorbs batch
+# width (wall time flat) before it saturates (wall time grows).
+# Largest cell (5 envs x 20000 agents) forecasts ~4.5 GB device memory: fits
+# the Colab T4 (16 GB) but keep run.prealloc=true for a solo run.
+#   python -m jmbc.sweep sweep=scaling_agents
+name: scaling-agents-5env
+base_exp: ks
+
+axes:
+  env.n_agents: [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]
+
+overrides:
+  train.num_envs: 5
+  train.total_timesteps: 20000   # sequential: 100 updates per cell
+  train.num_minibatches: 8       # divides every 5-env batch (1000*n)
+  diag.economic: false
+  diag.distributional: false
+  run.device: auto
+
+repeats: 1
+collect_diagnostics: false
+figures: [walltime, throughput]

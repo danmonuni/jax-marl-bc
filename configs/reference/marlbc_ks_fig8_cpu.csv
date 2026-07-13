@@ -1,0 +1,33 @@
+# Wall-clock training times of the original MARL-BC implementation on a single
+# CPU, digitized from Gabriele et al. (2026), Figure 8, right panel: mean-field
+# Krusell-Smith limit, training runs of 1e5 per-agent updates (n * 1e5 total
+# transitions), mean over 8 runs. Digitized by marker-pixel extraction from the
+# paper PDF with axis calibration on the tick labels (read-off error ~2-3%).
+# The matched JaxMARL-BC budget is num_envs=1, total_timesteps=1e5 (sequential
+# steps == per-agent transitions). PPO is the like-for-like series (we train
+# PPO); SAC is the paper's preferred algorithm.
+method,n_agents,num_envs,time_hours
+MARL-BC PPO (CPU),10,1,0.45
+MARL-BC PPO (CPU),20,1,0.71
+MARL-BC PPO (CPU),50,1,1.46
+MARL-BC PPO (CPU),100,1,2.67
+MARL-BC PPO (CPU),200,1,3.93
+MARL-BC PPO (CPU),500,1,7.09
+MARL-BC SAC (CPU),10,1,0.69
+MARL-BC SAC (CPU),20,1,0.76
+MARL-BC SAC (CPU),50,1,0.94
+MARL-BC SAC (CPU),100,1,1.42
+MARL-BC SAC (CPU),200,1,1.87
+MARL-BC SAC (CPU),500,1,2.95
+MARL-BC TD3 (CPU),10,1,0.55
+MARL-BC TD3 (CPU),20,1,0.64
+MARL-BC TD3 (CPU),50,1,0.89
+MARL-BC TD3 (CPU),100,1,1.16
+MARL-BC TD3 (CPU),200,1,1.51
+MARL-BC TD3 (CPU),500,1,2.41
+MARL-BC DDPG (CPU),10,1,0.59
+MARL-BC DDPG (CPU),20,1,0.67
+MARL-BC DDPG (CPU),50,1,0.94
+MARL-BC DDPG (CPU),100,1,1.27
+MARL-BC DDPG (CPU),200,1,2.13
+MARL-BC DDPG (CPU),500,1,3.41

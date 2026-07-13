@@ -91,11 +91,14 @@ def plot_ks_fig4(recs, snap_idxs, snap_steps, path, burn_frac=0.5):
         [fig.add_subplot(gs_right[0]), fig.add_subplot(gs_right[1])],
         [rec_before, rec_after], ["Untrained", "Trained"],
     ):
-        W = stationary_slice(np.asarray(rec["wealths"]), burn_frac)
-        CF = stationary_slice(np.asarray(rec["c_fracs"]), burn_frac)
-        emp = stationary_slice(np.asarray(rec["emp_states"]), burn_frac)
+        # emp_states[t] is recorded from the post-step state, i.e. the draw for
+        # period t+1; the employment that entered the policy's observation for
+        # (wealths[t], c_fracs[t]) is emp_states[t-1]. Colour by the lag.
+        W = stationary_slice(np.asarray(rec["wealths"])[1:], burn_frac)
+        CF = stationary_slice(np.asarray(rec["c_fracs"])[1:], burn_frac)
+        emp = stationary_slice(np.asarray(rec["emp_states"])[:-1], burn_frac)
         if "done" in rec:  # drop auto-reset steps (none in reset-free evals)
-            keep = ~stationary_slice(np.asarray(rec["done"]), burn_frac).astype(bool)
+            keep = ~stationary_slice(np.asarray(rec["done"])[1:], burn_frac).astype(bool)
             W, CF, emp = W[keep], CF[keep], emp[keep]
         W, CF, emp = W.flatten(), CF.flatten(), emp.flatten()
         ax.scatter(W[emp == 1], CF[emp == 1], s=1, alpha=0.3, color="tab:orange", label="employed")
