@@ -150,77 +150,6 @@ def plot_ks_wealth_heatmap(recs: List[dict], snap_steps: Sequence[float], path: 
     plt.close(fig)
 
 
-# ── 3. Marginal propensity to consume ─────────────────────────────────────────
-
-def _binned_median(x, y, bins):
-    idx = np.digitize(x, bins) - 1
-    out = np.full(len(bins) - 1, np.nan)
-    for i in range(len(bins) - 1):
-        m = idx == i
-        if m.sum() >= 10:
-            out[i] = np.median(y[m])
-    return out
-
-
-def plot_ks_mpc(recs: List[dict], snap_steps: Sequence[float], path: str,
-                burn_frac: float = 0.5, n_bins: int = 30):
-    """Left: MPC vs wealth by employment status, untrained vs trained.
-    Right: median MPC (overall / employed / unemployed) through training."""
-    import matplotlib.pyplot as plt
-    apply_style()
-
-    def _panel_data(rec):
-        keep = _interior_mask(rec, burn_frac)
-        w = stationary_slice(rec["wealths"], burn_frac)[keep].ravel()
-        m = stationary_slice(rec["mpc"], burn_frac)[keep].ravel()
-        e = stationary_slice(rec["emp_states"], burn_frac)[keep].ravel()
-        ok = np.isfinite(m)
-        return w[ok], m[ok], e[ok]
-
-    fig, axes = plt.subplots(1, 2, figsize=(11, 4.4))
-
-    ax = axes[0]
-    w_tr, m_tr, e_tr = _panel_data(recs[-1])
-    lo, hi = np.percentile(w_tr, 1), np.percentile(w_tr, 99)
-    bins = np.linspace(lo, hi, n_bins + 1)
-    cx = 0.5 * (bins[:-1] + bins[1:])
-    for emp, col, lab in ((1, "tab:orange", "employed"), (0, "tab:blue", "unemployed")):
-        sel = e_tr == emp
-        ax.plot(cx, _binned_median(w_tr[sel], m_tr[sel], bins), color=col,
-                marker="o", markersize=3, label=f"trained, {lab}")
-    # Untrained policy lives on its own (typically much lower) wealth range,
-    # so bin it separately or the curve vanishes off the trained bins.
-    w_un, m_un, _ = _panel_data(recs[0])
-    lo_u, hi_u = np.percentile(w_un, 1), np.percentile(w_un, 99)
-    bins_u = np.linspace(lo_u, max(hi_u, lo_u + 1e-6), n_bins + 1)
-    cx_u = 0.5 * (bins_u[:-1] + bins_u[1:])
-    ax.plot(cx_u, _binned_median(w_un, m_un, bins_u), color="0.6", ls="--",
-            label="untrained (all)")
-    ax.set_xlabel("Wealth (cash-on-hand)")
-    ax.set_ylabel("MPC  $\\partial c / \\partial a$")
-    ax.set_title("MPC by wealth and employment status")
-    ax.legend()
-
-    ax = axes[1]
-    med_all, med_emp, med_une = [], [], []
-    for rec in recs:
-        w, m, e = _panel_data(rec)
-        med_all.append(np.median(m) if m.size else np.nan)
-        med_emp.append(np.median(m[e == 1]) if (e == 1).any() else np.nan)
-        med_une.append(np.median(m[e == 0]) if (e == 0).any() else np.nan)
-    ax.plot(snap_steps, med_all, marker="o", color="k", label="all")
-    ax.plot(snap_steps, med_emp, marker="o", color="tab:orange", label="employed")
-    ax.plot(snap_steps, med_une, marker="o", color="tab:blue", label="unemployed")
-    ax.set_xscale("log")
-    ax.set_xlabel("Training env steps"); ax.set_ylabel("median MPC")
-    ax.set_title("MPC through training")
-    ax.legend()
-
-    fig.tight_layout()
-    fig.savefig(path, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-
-
 # ── Shared driver: everything the KS experiment (or jmbc.analyze) renders ────
 
 def render_ks_figures(recs: List[dict], snap_steps: Sequence[float],
@@ -236,7 +165,6 @@ def render_ks_figures(recs: List[dict], snap_steps: Sequence[float],
                           burn_frac)
     plot_ks_wealth_heatmap(recs, snap_steps, str(fig_dir / "ks_wealth_heatmap.png"),
                            burn_frac)
-    plot_ks_mpc(recs, snap_steps, str(fig_dir / "ks_mpc.png"), burn_frac)
 
     # fig4 wants exactly 4 snapshots for its 2x2 LoM grid.
     S = len(recs)

@@ -43,7 +43,8 @@ def plot_rbc_policy(metrics, steps_per_update, c_target, l_target, path, title="
 
 
 def plot_ks_fig4(recs, snap_idxs, snap_steps, path, burn_frac=0.5):
-    """Law-of-motion scatters, wealth histograms, MPC scatter (before/after).
+    """Law-of-motion scatters, wealth histograms, consumption-policy scatter
+    (before/after).
 
     Every panel uses only the stationary (post burn-in) slice of the eval
     rollouts, so the transient from k_init does not pollute the LoM fits,

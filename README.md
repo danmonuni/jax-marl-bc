@@ -55,7 +55,7 @@ runs/<exp>/<run_id>/
   diagnostics.json     # economic + distributional probes across snapshots
   timing.json          # wall time, throughput, device
   rollouts.npz         # RAW snapshot rollouts: every recorded channel
-                       # (capital, wealth, consumption, MPC, employment,
+                       # (capital, wealth, consumption, employment,
                        # aggregate state, ...) at each training snapshot
   figures/
     training_health.png      # PPO convergence panel
@@ -63,7 +63,6 @@ runs/<exp>/<run_id>/
     distributional.png       # Gini & top shares vs steps
     ks_lom_evolution.png     # aggregate law of motion through training
     ks_wealth_heatmap.png    # wealth distribution vs training (density heatmap)
-    ks_mpc.png               # MPC by wealth/employment + through training
     <bespoke>.png            # rbc policy / ks_fig4 / figure5
 ```
 

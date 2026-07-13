@@ -2,7 +2,6 @@ from .rollout import simulate, simulate_seeds
 from .distributional import (
     gini,
     lorenz,
-    mpc_curve,
     top_shares,
     dist_summary,
     distributional_report,
@@ -29,7 +28,6 @@ __all__ = [
     "simulate_seeds",
     "gini",
     "lorenz",
-    "mpc_curve",
     "top_shares",
     "dist_summary",
     "distributional_report",

@@ -76,7 +76,7 @@ class DiagConfig:
     # None -> same as env.n_agents. Requires kappas/lambdas = null (homogeneous).
     n_agents: Optional[int] = None
     economic: bool = True                   # Euler errors, resource residual, etc.
-    distributional: bool = True             # Gini, Lorenz, top shares, MPC
+    distributional: bool = True             # Gini, Lorenz, top shares
     burn_frac: float = 0.5                  # fraction of rollout discarded as burn-in
 
 

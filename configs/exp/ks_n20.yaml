@@ -34,7 +34,7 @@ train:
   log_every: 100
 
 diag:
-  n_agents: 2000            # common evaluation population for all cells
+  n_agents: 20            # common evaluation population for all cells
 
 log:
   save_agents: 200          # eval runs at n=2000 in every cell; cap raw dump

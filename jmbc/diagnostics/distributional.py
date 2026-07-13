@@ -32,24 +32,6 @@ def lorenz(values):
     )
 
 
-def mpc_curve(w, cf, n_bins=40):
-    """Median consumption fraction by wealth bin (a proxy MPC curve)."""
-    w = np.asarray(w).flatten()
-    cf = np.asarray(cf).flatten()
-    if len(w) == 0:
-        return np.array([]), np.array([])
-    lo, hi = np.percentile(w, 2), np.percentile(w, 98)
-    if lo == hi:
-        hi += 1e-5
-    bins = np.linspace(lo, hi, n_bins + 1)
-    cx = 0.5 * (bins[:-1] + bins[1:])
-    cy = []
-    for i in range(n_bins):
-        mask = (w >= bins[i]) & (w < bins[i + 1])
-        cy.append(np.median(cf[mask]) if np.sum(mask) > 0 else np.nan)
-    return cx, np.array(cy)
-
-
 def top_shares(values, quantiles=(0.01, 0.1)) -> Dict[str, float]:
     """Share of total wealth held by the top q fraction of agents."""
     v = np.sort(np.abs(np.asarray(values).flatten()))[::-1]  # descending

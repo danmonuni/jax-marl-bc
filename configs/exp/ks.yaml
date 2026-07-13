@@ -5,7 +5,7 @@ env:
   kind: ks
   n_agents: 20
   delta: 0.025
-  max_steps: 5000
+  max_steps: 200
   k_init: 1.0
   # `labour` = own employment status x productivity: without it the policy
   # cannot condition consumption on being unemployed (no precautionary motive).
@@ -19,5 +19,5 @@ train:
                     # (ks-local-01 hit KL~0.05 late in training at fixed lr)
 
 diag:
-  n_snapshots: 12   # resolution of the training-evolution figures (heatmap etc.)
+  n_snapshots: 200   # resolution of the training-evolution figures (heatmap etc.)
   sim_steps: 5000   # one long reset-free evaluation episode (KS-style long sim)

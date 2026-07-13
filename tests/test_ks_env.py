@@ -1,4 +1,4 @@
-"""KS environment semantics: aggregate risk, employment calibration, MPC probe."""
+"""KS environment semantics: aggregate risk and employment calibration."""
 import os
 os.environ["JAX_PLATFORM_NAME"] = "cpu"
 
@@ -70,22 +70,8 @@ def test_unemployment_rates_match_calibration():
     print(f"PASS  test_unemployment_rates_match_calibration  (u_g={u_good:.3f}, u_b={u_bad:.3f})")
 
 
-def test_mpc_channel():
-    """The rollout records a finite MPC for interior (non-reset) steps."""
-    env = _env(max_steps=100)
-    net, params = _net_params(env)
-    rec = simulate(env, net, params, jax.random.PRNGKey(5), n_steps=300)
-    assert "mpc" in rec and rec["mpc"].shape == (300, N_AGENTS)
-    keep = ~np.asarray(rec["done"]).astype(bool)
-    m = np.asarray(rec["mpc"])[keep]
-    assert np.all(np.isfinite(m)), "MPC must be finite on interior steps"
-    assert 0.0 <= np.median(m) <= 1.5, f"median MPC implausible: {np.median(m):.3f}"
-    print(f"PASS  test_mpc_channel  (median MPC={np.median(m):.3f})")
-
-
 if __name__ == "__main__":
     test_conditional_chain_is_valid()
     test_aggregate_state_switches()
     test_unemployment_rates_match_calibration()
-    test_mpc_channel()
     print("\nAll KS env tests passed.")

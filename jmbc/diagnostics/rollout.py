@@ -31,8 +31,6 @@ def _make_step(env, net, params):
     use_vec = hasattr(env, "step_mat")
     alpha, delta = env.alpha, env.delta
     kappas, lambdas = env.kappas, env.lambdas
-    # Column of the capital observation, for the finite-difference MPC probe.
-    cap_col = env.obs_vars.index("capital") if "capital" in env.obs_vars else None
 
     def _step(carry, _):
         obs_mat, state, key = carry
@@ -55,16 +53,6 @@ def _make_step(env, net, params):
         R_i = 1.0 - delta + r_i
         k_in_mean = jnp.mean(state.ks)
 
-        # Policy-based MPC: bump this period's capital by eps (prices held
-        # fixed, mean-field), re-evaluate the policy, and difference realized
-        # consumption: mpc_i = [c(k+eps) - c(k)] / [dw], dw = R_i * eps.
-        if cap_col is not None:
-            eps = 0.05 * jnp.maximum(state.ks, 0.1)
-            obs_pert = obs_mat.at[:, cap_col].add(eps)
-            pi_p, _ = net.apply(params, obs_pert)
-            c_frac_p = jnp.clip((pi_p.loc[:, 0] + 1) / 2, 0.01, 0.99)
-            dw = R_i * eps
-
         key, sk = jax.random.split(key)
         if use_vec:
             obs_mat_n, state, rew_arr, done = env.step_mat(sk, state, mu)
@@ -76,16 +64,11 @@ def _make_step(env, net, params):
             done = dones["__all__"]
 
         cons = c_frac * state.wealths  # c_t = c_frac * a_t
-        if cap_col is not None:
-            mpc = (c_frac_p * (state.wealths + dw) - cons) / dw
-        else:
-            mpc = jnp.full((env.num_agents,), jnp.nan)
         record = {
             "ks": state.ks,
             "wealths": state.wealths,
             "c_fracs": c_frac,
             "cons": cons,
-            "mpc": mpc,
             "ls": labour_t,
             "R": R_i,
             "Y": Y,

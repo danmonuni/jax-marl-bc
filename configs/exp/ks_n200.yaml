@@ -18,7 +18,7 @@ train:
   log_every: 100
 
 diag:
-  n_agents: 2000            # common evaluation population for all cells
+  n_agents: 200           # common evaluation population for all cells
 
 log:
   save_agents: 200
