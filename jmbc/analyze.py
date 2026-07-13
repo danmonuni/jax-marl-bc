@@ -64,7 +64,7 @@ def analyze_run(run_dir: str) -> dict:
 
     if cfg.env.kind == "ks":
         render_ks_figures(recs, np.asarray(env_steps, float),
-                          int(cfg.env.max_steps), fig_dir, burn_frac=burn)
+                          fig_dir, burn_frac=burn)
 
     print(f"[analyze] {run_dir}: {len(recs)} snapshots -> diagnostics.json + figures/")
     return summary

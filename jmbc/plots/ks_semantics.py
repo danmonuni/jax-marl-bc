@@ -44,8 +44,8 @@ def plot_ks_lom_evolution(recs: List[dict], snap_steps: Sequence[float], path: s
 
     fits, r2s, dh_mean, dh_max = [], [], [], []
     for rec in recs:
-        rules, r2 = ks_forecast_rule(rec)
-        dh = den_haan_stat(rec)
+        rules, r2 = ks_forecast_rule(rec, burn_frac)
+        dh = den_haan_stat(rec, burn_frac)
         fits.append(rules)
         r2s.append(r2)
         dh_mean.append(dh["den_haan_mean_pct"])
@@ -54,11 +54,12 @@ def plot_ks_lom_evolution(recs: List[dict], snap_steps: Sequence[float], path: s
     fig, axes = plt.subplots(1, 3, figsize=(15, 4.4))
 
     ax = axes[0]
-    K_all = np.concatenate([np.asarray(r["K"]).ravel() for r in recs])
+    K_all = np.concatenate(
+        [stationary_slice(np.asarray(r["K"]), burn_frac).ravel() for r in recs])
     lo, hi = np.percentile(K_all, 1), np.percentile(K_all, 99)
     xr = np.linspace(lo, hi, 50)
     # Faint scatter of the final snapshot as ground truth.
-    Kf = np.asarray(recs[-1]["K"]).ravel()
+    Kf = stationary_slice(np.asarray(recs[-1]["K"]), burn_frac).ravel()
     ax.scatter(Kf[:-1], Kf[1:], s=2, alpha=0.12, color="0.55", zorder=1,
                label="final rollout")
     for s, rules in enumerate(fits):
@@ -222,7 +223,7 @@ def plot_ks_mpc(recs: List[dict], snap_steps: Sequence[float], path: str,
 
 # ── Shared driver: everything the KS experiment (or jmbc.analyze) renders ────
 
-def render_ks_figures(recs: List[dict], snap_steps: Sequence[float], max_steps: int,
+def render_ks_figures(recs: List[dict], snap_steps: Sequence[float],
                       fig_dir, burn_frac: float = 0.5):
     """Render the full KS figure set into ``fig_dir``. Numpy-only."""
     from .figures import plot_ks_fig4
@@ -241,4 +242,4 @@ def render_ks_figures(recs: List[dict], snap_steps: Sequence[float], max_steps: 
     S = len(recs)
     sel = sorted(set(np.linspace(0, S - 1, 4).round().astype(int))) if S > 4 else range(S)
     plot_ks_fig4([recs[i] for i in sel], [i for i in sel],
-                 snap_steps[list(sel)], max_steps, str(fig_dir / "ks_fig4.png"))
+                 snap_steps[list(sel)], str(fig_dir / "ks_fig4.png"), burn_frac)

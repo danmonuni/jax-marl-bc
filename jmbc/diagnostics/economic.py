@@ -118,13 +118,15 @@ def analytical_rbc_compare(
 
 # ── Krusell-Smith forecasting quality ─────────────────────────────────────────
 
-def ks_forecast_rule(rec):
+def ks_forecast_rule(rec, burn_frac: float = 0.5):
     """Fit the aggregate law of motion K_{t+1} = a_s + b_s * K_t per agg state.
 
+    Fit on the stationary slice only: the transient from k_init spans a wide,
+    nearly deterministic K range that a line fits trivially, inflating R^2.
     Returns (rules, r2_overall) where rules maps state in {0,1} -> (a, b).
     """
-    K = np.asarray(rec["K"]).flatten()
-    agg = np.asarray(rec["agg_state"]).flatten()
+    K = stationary_slice(np.asarray(rec["K"]), burn_frac).flatten()
+    agg = stationary_slice(np.asarray(rec["agg_state"]), burn_frac).flatten()
     Kt, Kt1, st = K[:-1], K[1:], agg[:-1]
     rules = {}
     for s in (0, 1):
@@ -141,15 +143,16 @@ def ks_forecast_rule(rec):
     return rules, float(1.0 - ss_res / ss_tot)
 
 
-def den_haan_stat(rec) -> Dict[str, float]:
+def den_haan_stat(rec, burn_frac: float = 0.5) -> Dict[str, float]:
     """Den Haan statistic: max/mean dynamic-forecast error (%) of the agg rule.
 
     The forecasting rule is iterated forward on its own predictions (feeding the
-    actual aggregate-state sequence) and compared to the realized capital path.
+    actual aggregate-state sequence) and compared to the realized capital path,
+    both starting from the first stationary (post burn-in) period.
     """
-    rules, r2 = ks_forecast_rule(rec)
-    K = np.asarray(rec["K"]).flatten()
-    agg = np.asarray(rec["agg_state"]).flatten()
+    rules, r2 = ks_forecast_rule(rec, burn_frac)
+    K = stationary_slice(np.asarray(rec["K"]), burn_frac).flatten()
+    agg = stationary_slice(np.asarray(rec["agg_state"]), burn_frac).flatten()
     if K.size < 3:
         return {"ks_lom_r2": r2, "den_haan_max_pct": float("nan"),
                 "den_haan_mean_pct": float("nan")}
@@ -182,5 +185,5 @@ def economic_report(rec, env_cfg, burn_frac: float = 0.5) -> Dict[str, object]:
         if cmp is not None:
             out["analytical_rbc"] = cmp
     if env_cfg.kind == "ks":
-        out["ks_forecast"] = den_haan_stat(rec)
+        out["ks_forecast"] = den_haan_stat(rec, burn_frac)
     return out

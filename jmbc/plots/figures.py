@@ -10,7 +10,7 @@ from typing import List
 import numpy as np
 
 from .style import apply_style, COLORS
-from ..diagnostics.distributional import gini, lorenz
+from ..diagnostics.distributional import gini, lorenz, stationary_slice
 
 
 def plot_rbc_policy(metrics, steps_per_update, c_target, l_target, path, title=""):
@@ -42,8 +42,13 @@ def plot_rbc_policy(metrics, steps_per_update, c_target, l_target, path, title="
     plt.close(fig)
 
 
-def plot_ks_fig4(recs, snap_idxs, snap_steps, max_steps, path):
-    """Law-of-motion scatters, wealth histograms, MPC scatter (before/after)."""
+def plot_ks_fig4(recs, snap_idxs, snap_steps, path, burn_frac=0.5):
+    """Law-of-motion scatters, wealth histograms, MPC scatter (before/after).
+
+    Every panel uses only the stationary (post burn-in) slice of the eval
+    rollouts, so the transient from k_init does not pollute the LoM fits,
+    histograms, or policy scatters.
+    """
     import matplotlib.pyplot as plt
     import matplotlib.gridspec as gridspec
     import scipy.stats as sp_stats
@@ -56,7 +61,8 @@ def plot_ks_fig4(recs, snap_idxs, snap_steps, max_steps, path):
     gs_left = gs_outer[0].subgridspec(2, 2, hspace=0.55, wspace=0.45)
     for panel_i, (idx, step, rec) in enumerate(zip(snap_idxs, snap_steps, recs)):
         ax = fig.add_subplot(gs_left[panel_i // 2, panel_i % 2])
-        K = np.asarray(rec["K"]); agg = np.asarray(rec["agg_state"])
+        K = stationary_slice(np.asarray(rec["K"]), burn_frac)
+        agg = stationary_slice(np.asarray(rec["agg_state"]), burn_frac)
         Kt, Kt1, agt = K[:-1], K[1:], agg[:-1]
         slope, intercept, r_value, *_ = sp_stats.linregress(Kt, Kt1)
         ax.scatter(Kt[agt == 1], Kt1[agt == 1], s=2, alpha=0.3, color="tab:orange", label="good")
@@ -72,7 +78,7 @@ def plot_ks_fig4(recs, snap_idxs, snap_steps, max_steps, path):
         [fig.add_subplot(gs_mid[0]), fig.add_subplot(gs_mid[1])],
         [rec_before, rec_after], ["Untrained", "Trained"],
     ):
-        k_vals = rec["ks"][-(max_steps):-1].flatten()
+        k_vals = stationary_slice(np.asarray(rec["ks"]), burn_frac).flatten()
         g = gini(k_vals)
         ax.hist(k_vals, bins=40, density=True, color="steelblue", alpha=0.75)
         ax.set_title(f"{label}  (Gini={g:.3f})", fontsize=9)
@@ -84,11 +90,11 @@ def plot_ks_fig4(recs, snap_idxs, snap_steps, max_steps, path):
         [fig.add_subplot(gs_right[0]), fig.add_subplot(gs_right[1])],
         [rec_before, rec_after], ["Untrained", "Trained"],
     ):
-        T = rec["wealths"].shape[0]
-        tail = slice(-min(2 * max_steps, T), None)
-        W, CF, emp = rec["wealths"][tail], rec["c_fracs"][tail], rec["emp_states"][tail]
+        W = stationary_slice(np.asarray(rec["wealths"]), burn_frac)
+        CF = stationary_slice(np.asarray(rec["c_fracs"]), burn_frac)
+        emp = stationary_slice(np.asarray(rec["emp_states"]), burn_frac)
         if "done" in rec:  # drop auto-reset steps (none in reset-free evals)
-            keep = ~np.asarray(rec["done"][tail]).astype(bool)
+            keep = ~stationary_slice(np.asarray(rec["done"]), burn_frac).astype(bool)
             W, CF, emp = W[keep], CF[keep], emp[keep]
         W, CF, emp = W.flatten(), CF.flatten(), emp.flatten()
         ax.scatter(W[emp == 1], CF[emp == 1], s=1, alpha=0.3, color="tab:orange", label="employed")

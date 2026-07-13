@@ -6,3 +6,5 @@ lunghezza di environment e di rollout len  200
 
 nella fase di diagnosi la distribuzione e stazionaria quindi non ce bisogno di fare lo spacing log 
 
+pulire i transienti
+
