@@ -27,10 +27,10 @@ env:
 
 train:
   num_envs: 32
-  rollout_len: 64
+  rollout_len: 200
   total_timesteps: 128000   # = 2000 updates x 64 sequential steps
   update_epochs: 4
-  num_minibatches: 4
+  num_minibatches: 64
   log_every: 100
 
 diag:
