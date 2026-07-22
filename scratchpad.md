@@ -1,9 +1,13 @@
-beta va fissato a 0.95 
-
-ks deve essere random uniform tra 10 e 70
-
-lunghezza di environment e di rollout len  200 
-
-nella fase di diagnosi la distribuzione e stazionaria quindi non ce bisogno di fare lo spacing log 
+figura architetturale di come funziona lo speedup che mostri le direzioni di parallelismo e compilazione
 
 
+stessa figura:
+
+- figura scaling vs n_agents: jax-marl-on-gpu, jax-marl-on-cpu, marlbc-on-cpu (sia ppo che sac)
+  dati marlbc-on-cpu (sia ppo che sac): 
+
+- scalare fino a 20k o 1M di agenti
+
+
+
+ultima run con heterogeneous returns prendendo la cdf dal paper

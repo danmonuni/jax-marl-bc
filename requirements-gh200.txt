@@ -1,0 +1,22 @@
+# GH200 (Grace Hopper, aarch64) GPU cluster install.
+# Same jax/flax pin as requirements.txt (Colab), but uses the cluster's own
+# CUDA/cuDNN via jax[cuda12-local] instead of pip-vendored nvidia-*-cu12
+# wheels. On aarch64, pip-bundled cuSolver/cuBLAS builds have a history of
+# ABI mismatches against the driver (RuntimeError: gpusolverDnCreate failed:
+# cuSolver internal error) -- letting jaxlib link the module-provided CUDA
+# stack sidesteps that. Load matching `cuda`/`cudnn` modules (check with
+# `module avail cuda cudnn`, versions should be CUDA >=12.1, cuDNN >=9.8,<10)
+# before `pip install -r requirements-gh200.txt`.
+numpy
+pytest
+jax[cuda12-local]==0.4.34
+flax==0.8.5
+optax
+jaxmarl
+chex
+gymnax
+distrax
+matplotlib
+scipy
+omegaconf
+pandas

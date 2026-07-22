@@ -79,14 +79,49 @@ def _extract_diag_scalars(summary) -> Dict[str, float]:
     return out
 
 
+def replot(scfg, results_dir: Path) -> None:
+    """Re-render the sweep's figures from a saved results.csv — no training,
+    no JAX. Lets figure kinds be added/tweaked ex post (mirrors jmbc.analyze).
+    """
+    import pandas as pd
+    from .plots import ensure_time_column, make_sweep_figures
+
+    csv_path = results_dir / "results.csv"
+    if not csv_path.exists():
+        raise FileNotFoundError(f"no results.csv under {results_dir}")
+    df = ensure_time_column(pd.read_csv(csv_path))
+    print(f"replotting from {csv_path}  ({len(df)} rows)")
+    if scfg.reference_csv:
+        ref = load_reference(str(scfg.reference_csv))
+        df = pd.concat([df, ref], ignore_index=True)
+    axes = OmegaConf.to_container(scfg.axes, resolve=True) or {}
+    figs = make_sweep_figures(
+        df, axes, str(results_dir), figures=list(scfg.figures),
+        tradeoff_product=(int(scfg.tradeoff_product)
+                          if scfg.tradeoff_product else None),
+    )
+    for p in figs:
+        print(f"  figure -> {p}")
+
+
 def main(argv: Optional[Sequence[str]] = None) -> None:
     argv = list(sys.argv[1:] if argv is None else argv)
     sweep_name, overrides = parse_cli(argv, key="sweep")
     if sweep_name is None:
-        print("usage: python -m jmbc.sweep sweep=<name> [key=value ...]")
+        print("usage: python -m jmbc.sweep sweep=<name> [key=value ...] "
+              "[replot=<benchmarks/name dir>]")
         raise SystemExit(2)
 
+    replot_dir = None
+    for tok in list(overrides):
+        if tok.startswith("replot="):
+            replot_dir = tok.split("=", 1)[1]
+            overrides.remove(tok)
+
     scfg = load_sweep(sweep_name, overrides)
+    if replot_dir is not None:
+        replot(scfg, Path(replot_dir))
+        return
     base_over = _overrides_to_dotlist(OmegaConf.to_container(scfg.overrides, resolve=True))
 
     # Resolve device from the base experiment config before importing jax.
@@ -131,7 +166,14 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
                 do_figures=bool(scfg.save_cell_runs),
                 benchmark=bool(scfg.benchmark),
             )
-            row = {"method": "jaxmarl-bc", "base_exp": scfg.base_exp, "repeat": rep}
+            # Tag the method by resolved backend so a CPU-forced run of this
+            # same framework overlays as its own series (e.g. via
+            # reference_csv) instead of averaging into the GPU numbers under
+            # the same "jaxmarl-bc" label. GPU (the default target) keeps the
+            # bare name so every existing sweep's figures are unaffected.
+            device_tag = res["timing"].get("device") or "unknown"
+            method = "jaxmarl-bc" if device_tag == "gpu" else f"jaxmarl-bc-{device_tag}"
+            row = {"method": method, "base_exp": scfg.base_exp, "repeat": rep}
             for k, v in zip(keys, combo):
                 row[k.split(".")[-1]] = v
             row["n_agents"] = int(cfg.env.n_agents)

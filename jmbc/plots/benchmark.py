@@ -125,14 +125,25 @@ def plot_speedup(df, x: str, path: str, ours: str = OURS,
     return True
 
 
+def _cell_fmt(v: float) -> str:
+    if v < 100:
+        return f"{v:.2g}"
+    if v < 10_000:
+        return f"{v:,.0f}"
+    e = int(np.floor(np.log10(v)))
+    return f"{v / 10**e:.1f}e{e}"
+
+
 def plot_phase_diagram(df, path, x: str = "n_agents", y: str = "num_envs",
                        value: str = "time_s", ours: str = OURS,
+                       cbar_label: str = "steady-state run time (s)",
                        title: Optional[str] = None) -> bool:
-    """Phase diagram of absolute run time over the (x, y) mesh.
+    """Phase diagram of ``value`` (run time, throughput, ...) over the (x, y)
+    mesh.
 
     Cells are the mean over repeats; axes are categorical (one row/column per
     swept value, log-spaced grids stay readable). Sequential colormap, log
-    color scale, every cell direct-labeled with its time.
+    color scale, every cell direct-labeled with its value.
     """
     import matplotlib.pyplot as plt
     from matplotlib.colors import LogNorm
@@ -165,11 +176,10 @@ def plot_phase_diagram(df, path, x: str = "n_agents", y: str = "num_envs",
             v = piv.values[i, j]
             if not np.isfinite(v):
                 continue
-            txt = f"{v:.2g}" if v < 100 else f"{v:,.0f}"
             dark_cell = np.log(v) < log_mid
-            ax.text(j + 0.5, i + 0.5, txt, ha="center", va="center",
+            ax.text(j + 0.5, i + 0.5, _cell_fmt(v), ha="center", va="center",
                     fontsize=7, color="white" if dark_cell else "black")
-    fig.colorbar(mesh, ax=ax, label="steady-state run time (s)")
+    fig.colorbar(mesh, ax=ax, label=cbar_label)
     fig.tight_layout()
     fig.savefig(path)
     plt.close(fig)
@@ -295,6 +305,20 @@ def make_sweep_figures(df, axes, out_dir: str, figures: List[str],
                 paths.append(p)
             else:
                 _skip(kind, "needs >=2 values on both n_agents and num_envs")
+                continue
+            if "throughput_steps_per_s" in df.columns:
+                # Total transition rate: sequential steps x num_envs x
+                # n_agents per second (throughput_steps_per_s already
+                # includes num_envs).
+                d2 = df.copy()
+                d2["transitions_per_s"] = (
+                    d2["throughput_steps_per_s"] * d2["n_agents"])
+                p = str(out / "phase_throughput.png")
+                if plot_phase_diagram(
+                        d2, p, value="transitions_per_s",
+                        cbar_label="transitions / s",
+                        title="Throughput (transitions/s): num_envs vs n_agents"):
+                    paths.append(p)
         elif kind == "tradeoff":
             if not tradeoff_product:
                 _skip(kind, "tradeoff_product not set"); continue

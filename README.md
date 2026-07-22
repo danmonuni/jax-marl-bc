@@ -20,7 +20,9 @@ The package provides:
 ```bash
 pip install -e .
 # or, on a Colab T4 GPU instance:
-pip install -r requirements.txt   # uses jax[cuda12]
+pip install -r requirements.txt          # uses jax[cuda12] (pip-vendored CUDA)
+# or, on an aarch64 GPU cluster (e.g. GH200):
+pip install -r requirements-gh200.txt    # uses jax[cuda12-local] (module-provided CUDA)
 ```
 
 ## Run an experiment
