@@ -129,18 +129,20 @@ disconnect or a Ctrl-C partway through.
 
 ## Config interface
 
-`config.yaml` holds every script parameter (`base_exp`, `n_agents`, `mode`,
-`k_grid`, `es_iters`/`es_step0`/`es_grow`/`es_shrink`/`es_k0`, `sim_steps`,
-`seed`, `device`, `total_timesteps`, `out_dir`), loaded via the same merge
-order as `jmbc.config.load_config`: structured dataclass defaults <
-`config.yaml` < CLI dotlist overrides (later wins). No argparse flags —
-overrides look exactly like the rest of the repo's CLI (`env.n_agents=1000`
-style, just without the `env.` prefix since this script's config is its own
-small `CalibrationConfig`, not `jmbc`'s `ExperimentConfig`):
+`config.yaml` holds every script parameter (`base_exp`, `n_agents`,
+`num_envs`, `mode`, `k_grid`, `es_iters`/`es_step0`/`es_grow`/`es_shrink`/
+`es_k0`, `sim_steps`, `seed`, `device`, `total_timesteps`, `out_dir`), loaded
+via the same merge order as `jmbc.config.load_config`: structured dataclass
+defaults < `config.yaml` < CLI dotlist overrides (later wins). No argparse
+flags — overrides look exactly like the rest of the repo's CLI
+(`env.n_agents=1000` style, just without the `env.` prefix since this
+script's config is its own small `CalibrationConfig`, not `jmbc`'s
+`ExperimentConfig`):
 
 ```bash
 python calibrate_kappa_scale.py                          # config.yaml as-is (ES, n=1000)
 python calibrate_kappa_scale.py n_agents=500 device=cpu   # dotlist override
+python calibrate_kappa_scale.py num_envs=16               # override the envs count
 python calibrate_kappa_scale.py mode=grid "k_grid=[0.2,0.3]"
 python calibrate_kappa_scale.py config=variant.yaml       # a different file
 ```
@@ -150,6 +152,26 @@ the population) at least one agent — `n_agents >= 100`; the script raises a
 clear error otherwise rather than silently producing empty-bucket NaNs. At
 the default `n_agents=1000` every bucket count is exact (100 buckets-worth
 of 1%-wide resolution divides 1000 evenly: 200/200/200/100/100/100/50/20/20/10).
+
+**Batch width.** `train.num_envs` (`E`) isn't fixed by `base_exp` — the
+default here is `num_envs: 8`, not `ks_n200.yaml`'s own `32`, because what
+actually drives compute cost is the batch width `W = E * n_agents`
+(Section 5.2 of the paper / `runs/ks-scaling/`'s mesh): at `n_agents=1000`,
+`E=32` puts `W=32,000`, past the knee where the free T4's throughput plateau
+(measured at `W≈4,000-20,000`) starts mildly declining; `E=8` puts `W=8,000`,
+squarely inside that plateau. `num_envs` also controls how much data each
+gradient update sees (`NUM_UPDATES` itself is independent of it — training
+length is a sequential-step count, see `jmbc/algos/make_train.py`), so fewer
+envs means noisier per-update gradients at fixed `total_timesteps`; the
+launch summary printed at the start of every evaluation (see below) always
+shows the actual resolved `envs x agents`, so this never has to be inferred
+from how slow a run feels. `null` restores whatever `base_exp` sets.
+
+**Visibility.** Every evaluation now prints the project's own launch summary
+(`jmbc.experiments.common._print_launch_summary`: envs, agents, transitions,
+memory estimate) plus `phase()`-timestamped markers around training and the
+diagnostic rollout — the actual config being run, and where the wall-clock
+is going, are both directly readable in the output rather than inferred.
 
 `es_k0` (default: null, i.e. the naive `1/mean(base_vector) ≈ 0.26` guess
 before any general-equilibrium feedback is accounted for) is where the (1+1)

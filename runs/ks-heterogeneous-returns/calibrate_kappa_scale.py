@@ -57,6 +57,14 @@ class CalibrationConfig:
                                   # as ks_n20/ks_n200/ks_n2000, only n_agents
                                   # differs, and this script overrides that
     n_agents: int = 1000
+    num_envs: Optional[int] = 8   # None -> base_exp's own (32). Batch width
+                                  # W = num_envs * n_agents drives compute
+                                  # cost (see README "Batch width"); 8 puts
+                                  # W=8,000 at n_agents=1000 inside the
+                                  # 4,000-20,000 plateau the paper's own
+                                  # scaling mesh already measured, instead of
+                                  # 32's W=32,000 (past the knee, compute-
+                                  # bound, and not obviously buying anything)
     mode: str = "es"              # "es" (adaptive search) | "grid" (flat sweep)
     k_grid: List[float] = field(
         default_factory=lambda: [0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5])
@@ -159,6 +167,8 @@ def run_cell(k_multiplier: float, base_vector: np.ndarray, calib: CalibrationCon
     ]
     if calib.total_timesteps:
         overrides.append(f"train.total_timesteps={calib.total_timesteps}")
+    if calib.num_envs:
+        overrides.append(f"train.num_envs={calib.num_envs}")
     cfg = load_config(calib.base_exp, overrides)
     cfg.env.kappas = kappas
     setup_device(cfg.run.device, bool(cfg.run.prealloc))  # before jax import
