@@ -98,37 +98,69 @@ real ~70% top-10% share.
   close, but the script re-ranks by realized wealth precisely so this doesn't
   have to be assumed.
 
+## Search strategy
+
+Default `mode: es` — a (1+1) evolution strategy (Rechenberg's 1/5 success
+rule) instead of a flat grid, since a fixed grid wastes expensive evaluations
+(a full training run each, minutes to tens of minutes) on regions already
+known to be wrong. `k_multiplier` is a strictly-positive scale, so each
+proposal is multiplicative in log-space — `k_best * exp(step * randn())` —
+rather than additive: an improving move grows the step (be bolder, we're
+moving the right way), a rejected move shrinks it (be more cautious). The
+direction falls out of whichever side last improved, the scale is the
+adaptive step size, and the randomness is the proposal noise itself.
+
+`mode: grid` (the original flat sweep over `k_grid`) is still there — useful
+as a sanity-check baseline, or if the score surface turns out to have
+multiple local minima the (1+1)-ES could get stuck in (single-parameter
++ unimodal-ish is the case it's suited to; it is not a global optimizer).
+
+Bayesian optimization (fit a GP over every `(k, score)` pair, pick the next
+point by expected improvement) would be the more principled, sample-efficient
+alternative, and is worth revisiting if this becomes the two-parameter
+version from the earlier discussion (dispersion shape + scale) — a flat or
+adaptive-but-still-1-D search gets expensive fast in 2-D. Skipped for now:
+real added dependency (or a GP from scratch) for a problem that's currently
+one parameter.
+
+`results/results.csv` is rewritten after *every* evaluation, not just at the
+end — a multi-hour `n_agents=1000` run shouldn't lose everything to a Colab
+disconnect or a Ctrl-C partway through.
+
 ## Config interface
 
-`config.yaml` holds every script parameter (`base_exp`, `n_agents`, `k_grid`,
-`sim_steps`, `seed`, `device`, `total_timesteps`, `out_dir`), loaded via the
-same merge order as `jmbc.config.load_config`: structured dataclass defaults
-< `config.yaml` < CLI dotlist overrides (later wins). No argparse flags —
+`config.yaml` holds every script parameter (`base_exp`, `n_agents`, `mode`,
+`k_grid`, `es_iters`/`es_step0`/`es_grow`/`es_shrink`/`es_k0`, `sim_steps`,
+`seed`, `device`, `total_timesteps`, `out_dir`), loaded via the same merge
+order as `jmbc.config.load_config`: structured dataclass defaults <
+`config.yaml` < CLI dotlist overrides (later wins). No argparse flags —
 overrides look exactly like the rest of the repo's CLI (`env.n_agents=1000`
 style, just without the `env.` prefix since this script's config is its own
 small `CalibrationConfig`, not `jmbc`'s `ExperimentConfig`):
 
 ```bash
-python calibrate_kappa_scale.py                          # config.yaml as-is
+python calibrate_kappa_scale.py                          # config.yaml as-is (ES, n=1000)
 python calibrate_kappa_scale.py n_agents=500 device=cpu   # dotlist override
+python calibrate_kappa_scale.py mode=grid "k_grid=[0.2,0.3]"
 python calibrate_kappa_scale.py config=variant.yaml       # a different file
 ```
 
 `n_agents` must give every percentile bucket (finest = 99-100%, i.e. 1% of
 the population) at least one agent — `n_agents >= 100`; the script raises a
-clear error otherwise rather than silently producing empty-bucket NaNs.
+clear error otherwise rather than silently producing empty-bucket NaNs. At
+the default `n_agents=1000` every bucket count is exact (100 buckets-worth
+of 1%-wide resolution divides 1000 evenly: 200/200/200/100/100/100/50/20/20/10).
 
-The default `k_grid` (0.1-0.5) is centered on the value that would bring
-`mean(kappa)` back to roughly 1 (matching the homogeneous baseline's
-`kappa≡1` convention): the 10 raw target numbers average to ~3.9, so
-`k_multiplier ≈ 1/3.9 ≈ 0.26` is the naive starting guess before any
-general-equilibrium feedback is accounted for — the grid brackets it. Each
-cell is a full training run (reuses `configs/exp/ks_n200.yaml`, the exact
-protocol already validated for the paper's own n=200 correctness run, ~3 min
-on a free Colab T4); 7 grid points is comfortably one Colab session. If the
-score's minimum lands at a grid edge, extend the grid rather than trusting an
-edge value; if it's smooth and unimodal, a second, narrower grid around the
-best point is worth an extra pass before calling the fit final.
+`es_k0` (default: null, i.e. the naive `1/mean(base_vector) ≈ 0.26` guess
+before any general-equilibrium feedback is accounted for) is where the (1+1)
+search starts; `es_step0=0.3` is generous enough to explore roughly
+0.15-0.5x the starting guess in the first move. Each evaluation is a full
+training run reusing the same protocol as `configs/exp/ks_n200.yaml` /
+`ks_n2000.yaml` (only `env.n_agents` differs) — validated up to n=2000
+already, but **`n_agents=1000` is noticeably more expensive than the ~3
+min/cell the n=200 correctness run reports**; time the first evaluation
+before assuming the rest of a 13-evaluation ES run (1 initial + `es_iters=12`)
+fits in one Colab session.
 
 ## Outputs
 

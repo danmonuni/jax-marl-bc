@@ -53,11 +53,18 @@ PERIODS_PER_YEAR = 4          # ASSUMPTION: delta=0.025 matches the standard
 
 @dataclass
 class CalibrationConfig:
-    base_exp: str = "ks_n200"     # configs/exp/<base_exp>.yaml -- the paper's
-                                  # own validated n=200/GPU protocol
-    n_agents: int = 200
+    base_exp: str = "ks_n200"     # configs/exp/<base_exp>.yaml -- same protocol
+                                  # as ks_n20/ks_n200/ks_n2000, only n_agents
+                                  # differs, and this script overrides that
+    n_agents: int = 1000
+    mode: str = "es"              # "es" (adaptive search) | "grid" (flat sweep)
     k_grid: List[float] = field(
         default_factory=lambda: [0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5])
+    es_iters: int = 12            # additional evaluations after the initial guess
+    es_step0: float = 0.3         # initial log-space step stddev (multiplicative)
+    es_grow: float = 1.5          # step *= es_grow on an improving move
+    es_shrink: float = 0.7        # step *= es_shrink on a rejected move
+    es_k0: Optional[float] = None  # None -> 1/mean(base_vector) naive guess
     sim_steps: int = 5000
     seed: int = 0
     device: str = "gpu"           # "gpu" | "cpu" | "auto"
@@ -192,9 +199,90 @@ def score_fit(simulated_by_bucket, target_by_bucket, chart_mask):
     return ratio, float(np.sqrt(np.mean((ratio - 1.0) ** 2)))
 
 
+def evaluate_k(k, base_vector, counts, target_by_bucket, chart_mask,
+               bucket_labels, calib) -> dict:
+    """Train + simulate at this k_multiplier; return one flattened results
+    row (shared by both the grid sweep and the ES search)."""
+    print(f"\n=== k_multiplier = {k:.4f} "
+          f"(mean kappa = {k * base_vector.mean():.3f}) ===")
+    rec, delta = run_cell(k, base_vector, calib)
+    simulated_by_bucket, k_bar = steady_state_return_by_bucket(rec, delta, counts)
+    ratio, score = score_fit(simulated_by_bucket, target_by_bucket, chart_mask)
+
+    from jmbc.diagnostics import gini, top_shares
+    held_out = {"capital_gini": gini(k_bar), **top_shares(k_bar)}
+
+    row = {"k_multiplier": k, "score_rms_ratio_minus_1": score, **held_out}
+    for lbl, sim_r, tgt_r in zip(bucket_labels, simulated_by_bucket, target_by_bucket):
+        row[f"sim_return_pct[{lbl}]"] = sim_r
+        row[f"target_return_pct[{lbl}]"] = tgt_r
+
+    print(f"  score (RMS |ratio-1|) = {score:.4f}   "
+          f"held-out capital_gini = {held_out['capital_gini']:.3f}  "
+          f"top_10%_share = {held_out['top_0.1_share']:.3f}")
+    for lbl, sim_r, tgt_r in zip(bucket_labels, simulated_by_bucket, target_by_bucket):
+        print(f"    [{lbl:>7}] sim={sim_r:6.2f}%  target={tgt_r:5.2f}%  "
+              f"ratio={sim_r / tgt_r:5.2f}")
+    return row
+
+
+def es_search(base_vector, counts, target_by_bucket, chart_mask, bucket_labels,
+             calib, on_row=None):
+    """(1+1) evolution strategy, Rechenberg's 1/5 success rule.
+
+    k_multiplier is a strictly-positive scale, so steps are multiplicative in
+    log-space: propose k_best * exp(step * randn()). Accept if the score
+    improves (grow the step -- we're moving the right way, be bolder);
+    reject otherwise (shrink the step -- overshot or wrong direction, be more
+    cautious). Direction falls out of which side of k_best last improved;
+    scale is the adaptively-sized step; the randomness is the proposal noise
+    itself. Cheap (no new dependency), and well suited to an expensive
+    (~minutes/eval), unknown-shape 1-D objective -- see README "Search
+    strategy" for why this was chosen over e.g. Bayesian optimization.
+    """
+    rng = np.random.default_rng(calib.seed)
+    k_best = float(calib.es_k0) if calib.es_k0 else 1.0 / base_vector.mean()
+    step = float(calib.es_step0)
+
+    print(f"=== ES: initial guess k = {k_best:.4f} ===")
+    best_row = evaluate_k(k_best, base_vector, counts, target_by_bucket,
+                          chart_mask, bucket_labels, calib)
+    rows = [best_row]
+    if on_row:
+        on_row(best_row)
+
+    for i in range(calib.es_iters):
+        k_try = k_best * float(np.exp(step * rng.standard_normal()))
+        print(f"\n--- ES iteration {i + 1}/{calib.es_iters}  "
+              f"(current best k={k_best:.4f}, step={step:.3f}) ---")
+        row = evaluate_k(k_try, base_vector, counts, target_by_bucket,
+                         chart_mask, bucket_labels, calib)
+        rows.append(row)
+        if on_row:
+            on_row(row)
+
+        improved = row["score_rms_ratio_minus_1"] < best_row["score_rms_ratio_minus_1"]
+        if improved:
+            k_best, best_row, step = k_try, row, step * calib.es_grow
+            print(f"  IMPROVED ({row['score_rms_ratio_minus_1']:.4f} < "
+                  f"previous best) -> step x{calib.es_grow:g} = {step:.3f}")
+        else:
+            step *= calib.es_shrink
+            print(f"  rejected ({row['score_rms_ratio_minus_1']:.4f} >= "
+                  f"best {best_row['score_rms_ratio_minus_1']:.4f}) -> "
+                  f"step x{calib.es_shrink:g} = {step:.3f}")
+
+    return rows, best_row
+
+
 def main():
     calib = load_calib_config()
     print(f"config: {OmegaConf.to_yaml(calib)}")
+    if calib.n_agents >= 1000:
+        print(f"NOTE: n_agents={calib.n_agents} is well past the n=200 the "
+              f"~3 min/cell estimate elsewhere is based on -- time the first "
+              f"evaluation before trusting any total-runtime estimate for "
+              f"the rest of the {'search' if calib.mode == 'es' else 'grid'}.")
 
     buckets = load_target_buckets()
     counts = bucket_agent_counts(buckets, calib.n_agents)
@@ -208,35 +296,30 @@ def main():
         out_dir = HERE / out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    rows = []
-    for k in [float(x) for x in calib.k_grid]:
-        print(f"\n=== k_multiplier = {k:g} "
-              f"(mean kappa = {k * base_vector.mean():.3f}) ===")
-        rec, delta = run_cell(k, base_vector, calib)
-        simulated_by_bucket, k_bar = steady_state_return_by_bucket(rec, delta, counts)
-        ratio, score = score_fit(simulated_by_bucket, target_by_bucket, chart_mask)
-
-        from jmbc.diagnostics import gini, top_shares
-        held_out = {"capital_gini": gini(k_bar), **top_shares(k_bar)}
-
-        row = {"k_multiplier": k, "score_rms_ratio_minus_1": score, **held_out}
-        for lbl, sim_r, tgt_r in zip(bucket_labels, simulated_by_bucket, target_by_bucket):
-            row[f"sim_return_pct[{lbl}]"] = sim_r
-            row[f"target_return_pct[{lbl}]"] = tgt_r
-        rows.append(row)
-        print(f"  score (RMS |ratio-1|) = {score:.4f}   "
-              f"held-out capital_gini = {held_out['capital_gini']:.3f}  "
-              f"top_10%_share = {held_out['top_0.1_share']:.3f}")
-        for lbl, sim_r, tgt_r in zip(bucket_labels, simulated_by_bucket, target_by_bucket):
-            print(f"    [{lbl:>7}] sim={sim_r:6.2f}%  target={tgt_r:5.2f}%  "
-                  f"ratio={sim_r / tgt_r:5.2f}")
-
     import pandas as pd
-    df = pd.DataFrame(rows).sort_values("k_multiplier")
-    df.to_csv(out_dir / "results.csv", index=False)
-    best = df.loc[df["score_rms_ratio_minus_1"].idxmin()]
-    print(f"\nbest k_multiplier = {best['k_multiplier']:g} "
-          f"(score={best['score_rms_ratio_minus_1']:.4f}) -> {out_dir/'results.csv'}")
+    rows = []
+
+    def checkpoint(row):
+        """Overwrite results.csv after every evaluation -- a long ES/grid
+        run (hours at n_agents=1000) shouldn't lose everything to a
+        disconnect or Ctrl-C partway through."""
+        rows.append(row)
+        pd.DataFrame(rows).to_csv(out_dir / "results.csv", index=False)
+
+    if calib.mode == "es":
+        _, best_row = es_search(base_vector, counts, target_by_bucket,
+                                chart_mask, bucket_labels, calib, on_row=checkpoint)
+    elif calib.mode == "grid":
+        for k in [float(x) for x in calib.k_grid]:
+            checkpoint(evaluate_k(k, base_vector, counts, target_by_bucket,
+                                  chart_mask, bucket_labels, calib))
+        best_row = min(rows, key=lambda r: r["score_rms_ratio_minus_1"])
+    else:
+        raise ValueError(f"unknown mode: {calib.mode!r} (expected 'es' or 'grid')")
+
+    df = pd.DataFrame(rows)
+    print(f"\nbest k_multiplier = {best_row['k_multiplier']:.4f} "
+          f"(score={best_row['score_rms_ratio_minus_1']:.4f}) -> {out_dir/'results.csv'}")
 
     _plot_results(df, bucket_labels, target_by_bucket, chart_mask, out_dir)
 
@@ -245,11 +328,19 @@ def _plot_results(df, bucket_labels, target_by_bucket, chart_mask, out_dir):
     import matplotlib.pyplot as plt
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4.2))
-    ax1.plot(df["k_multiplier"], df["score_rms_ratio_minus_1"], "o-")
+    # Colored by evaluation order rather than connected in k-order: the ES
+    # search doesn't visit k monotonically, so a line would be misleading;
+    # the color progression still shows the search converging over time.
+    sc = ax1.scatter(df["k_multiplier"], df["score_rms_ratio_minus_1"],
+                     c=np.arange(len(df)), cmap="viridis")
+    best_idx = df["score_rms_ratio_minus_1"].idxmin()
+    ax1.scatter(df["k_multiplier"][best_idx], df["score_rms_ratio_minus_1"][best_idx],
+               marker="*", s=250, facecolors="none", edgecolors="red", linewidths=1.5)
+    fig.colorbar(sc, ax=ax1, label="evaluation order")
     ax1.set_xlabel("k_multiplier"); ax1.set_ylabel("RMS |simulated/target - 1|")
     ax1.set_title("Calibration score vs. kappa scale")
 
-    best = df.loc[df["score_rms_ratio_minus_1"].idxmin()]
+    best = df.loc[best_idx]
     x = np.arange(len(bucket_labels))
     sim = np.array([best[f"sim_return_pct[{lbl}]"] for lbl in bucket_labels])
     ax2.plot(x, target_by_bucket, "o-", label="target (Xavier 2021)")
