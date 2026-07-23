@@ -83,6 +83,13 @@ class CalibrationConfig:
     device: str = "gpu"           # "gpu" | "cpu" | "auto"
     total_timesteps: Optional[int] = None  # None -> base_exp's own budget
     out_dir: str = "results"      # relative to this file, or an absolute path
+    save_raw: str = "best"        # "none" | "best" | "all" -- see README "Raw
+                                  # data": "best" keeps the full rollout +
+                                  # trained params for whichever evaluation is
+                                  # the current best (overwritten as a better
+                                  # one is found), "all" keeps every
+                                  # evaluation (expensive), "none" keeps only
+                                  # the results.csv summary row
 
 
 def load_calib_config(argv: Optional[List[str]] = None) -> CalibrationConfig:
@@ -198,7 +205,7 @@ def run_cell(k_multiplier: float, base_vector: np.ndarray, calib: CalibrationCon
     rec = simulate(env, train_fn.network, out["params"],
                    jax.random.PRNGKey(7), n_steps=calib.sim_steps)
     phase("simulation done")
-    return rec, float(cfg.env.delta)
+    return rec, float(cfg.env.delta), out["params"], train_fn.network
 
 
 def steady_state_return_by_bucket(rec, delta: float, counts):
@@ -233,12 +240,19 @@ def score_fit(simulated_by_bucket, target_by_bucket, chart_mask):
 
 
 def evaluate_k(k, base_vector, counts, target_by_bucket, chart_mask,
-               bucket_labels, calib) -> dict:
-    """Train + simulate at this k_multiplier; return one flattened results
-    row (shared by both the grid sweep and the ES search)."""
+               bucket_labels, calib):
+    """Train + simulate at this k_multiplier.
+
+    Returns ``(row, artifacts)``: ``row`` is one flattened results-table row
+    (shared by all three search modes); ``artifacts`` carries the full raw
+    rollout + trained params/network so the caller can optionally persist
+    them (see ``save_raw`` in ``main``) -- ``row`` alone is only the
+    steady-state summary, not enough to regenerate a different figure later
+    without retraining.
+    """
     print(f"\n=== k_multiplier = {k:.4f} "
           f"(mean kappa = {k * base_vector.mean():.3f}) ===")
-    rec, delta = run_cell(k, base_vector, calib)
+    rec, delta, params, network = run_cell(k, base_vector, calib)
     simulated_by_bucket, k_bar = steady_state_return_by_bucket(rec, delta, counts)
     ratio, score = score_fit(simulated_by_bucket, target_by_bucket, chart_mask)
 
@@ -256,7 +270,9 @@ def evaluate_k(k, base_vector, counts, target_by_bucket, chart_mask,
     for lbl, sim_r, tgt_r in zip(bucket_labels, simulated_by_bucket, target_by_bucket):
         print(f"    [{lbl:>7}] sim={sim_r:6.2f}%  target={tgt_r:5.2f}%  "
               f"ratio={sim_r / tgt_r:5.2f}")
-    return row
+
+    artifacts = {"rec": rec, "params": params, "network": network, "delta": delta}
+    return row, artifacts
 
 
 def bo_search(base_vector, counts, target_by_bucket, chart_mask, bucket_labels,
@@ -282,11 +298,11 @@ def bo_search(base_vector, counts, target_by_bucket, chart_mask, bucket_labels,
 
     def objective(x):
         k = float(x[0])
-        row = evaluate_k(k, base_vector, counts, target_by_bucket, chart_mask,
-                         bucket_labels, calib)
+        row, artifacts = evaluate_k(k, base_vector, counts, target_by_bucket,
+                                    chart_mask, bucket_labels, calib)
         rows.append(row)
         if on_row:
-            on_row(row)
+            on_row(row, artifacts)
         return row["score_rms_ratio_minus_1"]
 
     lo, hi = float(calib.bo_bounds[0]), float(calib.bo_bounds[1])
@@ -321,21 +337,22 @@ def es_search(base_vector, counts, target_by_bucket, chart_mask, bucket_labels,
     step = float(calib.es_step0)
 
     print(f"=== ES: initial guess k = {k_best:.4f} ===")
-    best_row = evaluate_k(k_best, base_vector, counts, target_by_bucket,
-                          chart_mask, bucket_labels, calib)
+    best_row, best_artifacts = evaluate_k(k_best, base_vector, counts,
+                                          target_by_bucket, chart_mask,
+                                          bucket_labels, calib)
     rows = [best_row]
     if on_row:
-        on_row(best_row)
+        on_row(best_row, best_artifacts)
 
     for i in range(calib.es_iters):
         k_try = k_best * float(np.exp(step * rng.standard_normal()))
         print(f"\n--- ES iteration {i + 1}/{calib.es_iters}  "
               f"(current best k={k_best:.4f}, step={step:.3f}) ---")
-        row = evaluate_k(k_try, base_vector, counts, target_by_bucket,
-                         chart_mask, bucket_labels, calib)
+        row, artifacts = evaluate_k(k_try, base_vector, counts, target_by_bucket,
+                                    chart_mask, bucket_labels, calib)
         rows.append(row)
         if on_row:
-            on_row(row)
+            on_row(row, artifacts)
 
         improved = row["score_rms_ratio_minus_1"] < best_row["score_rms_ratio_minus_1"]
         if improved:
@@ -374,13 +391,47 @@ def main():
 
     import pandas as pd
     rows = []
+    raw_dir = out_dir / "raw"
+    best_score = [float("inf")]  # mutable cell, closed over by checkpoint()
 
-    def checkpoint(row):
-        """Overwrite results.csv after every evaluation -- a long ES/grid
+    def save_raw(tag: str, artifacts: dict):
+        """Persist the full rollout + trained params/network under
+        results/raw/<tag>/ -- everything needed to regenerate a different
+        figure for this evaluation later without retraining."""
+        import pickle
+        from flax import serialization
+
+        d = raw_dir / tag
+        if d.exists():
+            import shutil
+            shutil.rmtree(d)
+        d.mkdir(parents=True, exist_ok=True)
+        np.savez_compressed(d / "rollout.npz", **artifacts["rec"])
+        with open(d / "params.msgpack", "wb") as f:
+            f.write(serialization.to_bytes(artifacts["params"]))
+        with open(d / "network.pkl", "wb") as f:
+            pickle.dump(artifacts["network"], f)
+        with open(d / "meta.json", "w") as f:
+            import json
+            json.dump({"delta": artifacts["delta"]}, f)
+
+    def checkpoint(row, artifacts=None):
+        """Overwrite results.csv after every evaluation -- a long BO/ES/grid
         run (hours at n_agents=1000) shouldn't lose everything to a
-        disconnect or Ctrl-C partway through."""
+        disconnect or Ctrl-C partway through. Also persists raw rollout data
+        per ``calib.save_raw`` (see README "Raw data")."""
         rows.append(row)
         pd.DataFrame(rows).to_csv(out_dir / "results.csv", index=False)
+        if artifacts is None or calib.save_raw == "none":
+            return
+        idx = len(rows) - 1
+        if calib.save_raw == "all":
+            save_raw(f"eval_{idx:03d}_k{row['k_multiplier']:.4f}", artifacts)
+        if row["score_rms_ratio_minus_1"] < best_score[0]:
+            best_score[0] = row["score_rms_ratio_minus_1"]
+            save_raw("best", artifacts)
+            print(f"  -> new best, raw rollout + params saved to "
+                  f"{raw_dir / 'best'}")
 
     if calib.mode == "bo":
         _, best_row = bo_search(base_vector, counts, target_by_bucket,
@@ -390,8 +441,9 @@ def main():
                                 chart_mask, bucket_labels, calib, on_row=checkpoint)
     elif calib.mode == "grid":
         for k in [float(x) for x in calib.k_grid]:
-            checkpoint(evaluate_k(k, base_vector, counts, target_by_bucket,
-                                  chart_mask, bucket_labels, calib))
+            row, artifacts = evaluate_k(k, base_vector, counts, target_by_bucket,
+                                        chart_mask, bucket_labels, calib)
+            checkpoint(row, artifacts)
         best_row = min(rows, key=lambda r: r["score_rms_ratio_minus_1"])
     else:
         raise ValueError(f"unknown mode: {calib.mode!r} (expected 'bo', 'es', or 'grid')")

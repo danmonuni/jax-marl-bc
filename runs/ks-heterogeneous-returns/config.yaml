@@ -25,3 +25,7 @@ seed: 0
 device: gpu
 total_timesteps: null   # null -> ks_n200's own budget (128000 steps)
 out_dir: results
+save_raw: best      # "none" | "best" (rollout + trained params for the
+                    # current best, overwritten as a better one is found) |
+                    # "all" (every evaluation -- expensive, especially with
+                    # bo_calls=50; see README "Raw data")

@@ -194,9 +194,56 @@ fits in one Colab session.
 ## Outputs
 
 `results/results.csv` — one row per `k_multiplier`: fit score, per-bucket
-simulated vs. target return, and the held-out Gini/top-share numbers.
-`results/calibration_fit.png` — score-vs-scale curve, and the best-fit
-simulated curve overlaid on the Xavier target curve.
+simulated vs. target return, and the held-out Gini/top-share numbers. This
+alone is enough to redraw `calibration_fit.png`, but *not* enough to make a
+different figure later (e.g. a wealth-distribution histogram, or the LoM
+evolution style plots elsewhere in this repo) without retraining — for that,
+see "Raw data" below.
+
+`results/calibration_fit.png` — score-vs-scale curve (colored by evaluation
+order), and the best-fit simulated curve overlaid on the Xavier target curve.
+
+## Raw data
+
+Controlled by `save_raw` (default `"best"`):
+- `"none"` — only `results.csv` + the final plot (smallest, fastest).
+- `"best"` — the above, plus the **full rollout + trained params/network**
+  for whichever evaluation is currently the best, under
+  `results/raw/best/`, overwritten every time a new best is found:
+  - `rollout.npz` — every recorded channel (`ks`, `wealths`, `cons`, `R`,
+    `emp_states`, `agg_state`, ... — the same channels `jmbc/diagnostics/`
+    computes from), `[T, n]`- or `[T]`-shaped, ~10s of MB compressed at the
+    default `n_agents=1000`/`sim_steps=5000`.
+  - `params.msgpack` — the trained policy, via `flax.serialization.to_bytes`.
+  - `network.pkl` — the `ActorCritic` config (`action_dim`/`hidden_dims`/
+    `activation`) needed to reconstruct the module before loading params into it.
+  - `meta.json` — `delta`, needed to interpret `rollout.npz`'s `R` channel
+    the same way `steady_state_return_by_bucket` does.
+
+  To reload and do something new with it:
+  ```python
+  import numpy as np, pickle, jax
+  from flax import serialization
+
+  rec = dict(np.load("results/raw/best/rollout.npz"))
+  with open("results/raw/best/network.pkl", "rb") as f:
+      network = pickle.load(f)
+  dummy = network.init(jax.random.PRNGKey(0), jax.numpy.zeros((6,)))  # 6 = obs_dim
+  with open("results/raw/best/params.msgpack", "rb") as f:
+      params = serialization.from_bytes(dummy, f.read())
+  # rec is exactly what jmbc.diagnostics.economic/distributional functions
+  # consume; params/network can run a fresh, longer, or differently-seeded
+  # simulate() without retraining.
+  ```
+- `"all"` — the above for *every* evaluation, under `results/raw/eval_NNN_k.../`
+  — thorough but expensive: at the default settings each evaluation's raw
+  data is comparable in size to `"best"`'s, so a 13-call BO run means ~13x
+  the disk. Opt in only if you actually plan to compare evaluations beyond
+  what `results.csv`'s summary already shows.
+
+Either way, raw data is written as part of the same per-evaluation
+checkpointing that already protects `results.csv` — a disconnect or Ctrl-C
+loses at most the evaluation in progress.
 
 ## Running it locally
 
