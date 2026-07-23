@@ -1,0 +1,12 @@
+# CalibrationConfig defaults for calibrate_kappa_scale.py. CLI dotlist
+# overrides win over this file (e.g. `python calibrate_kappa_scale.py
+# n_agents=500 device=cpu`); a different file entirely via `config=<path>`.
+
+base_exp: ks_n200   # configs/exp/ks_n200.yaml -- the paper's own n=200/GPU run
+n_agents: 200
+k_grid: [0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5]
+sim_steps: 5000
+seed: 0
+device: gpu
+total_timesteps: null   # null -> ks_n200's own budget (128000 steps)
+out_dir: results
