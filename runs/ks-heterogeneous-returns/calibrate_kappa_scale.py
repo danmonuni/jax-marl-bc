@@ -65,7 +65,12 @@ class CalibrationConfig:
                                   # scaling mesh already measured, instead of
                                   # 32's W=32,000 (past the knee, compute-
                                   # bound, and not obviously buying anything)
-    mode: str = "es"              # "es" (adaptive search) | "grid" (flat sweep)
+    mode: str = "bo"               # "bo" (Bayesian optimization) | "es"
+                                   # (adaptive 1+1 search) | "grid" (flat sweep)
+    bo_calls: int = 13             # total evaluations, including initial design
+    bo_init_points: int = 5        # random/quasi-random points before GP-guided
+                                   # acquisition kicks in (skopt n_initial_points)
+    bo_bounds: List[float] = field(default_factory=lambda: [0.02, 2.0])
     k_grid: List[float] = field(
         default_factory=lambda: [0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5])
     es_iters: int = 12            # additional evaluations after the initial guess
@@ -254,6 +259,49 @@ def evaluate_k(k, base_vector, counts, target_by_bucket, chart_mask,
     return row
 
 
+def bo_search(base_vector, counts, target_by_bucket, chart_mask, bucket_labels,
+             calib, on_row=None):
+    """Bayesian optimization: Gaussian-process surrogate + expected-
+    improvement (EI) acquisition, via scikit-optimize's ``gp_minimize``.
+
+    ``bo_init_points`` evaluations at random/quasi-random ``k`` build the
+    initial GP fit; each further evaluation (up to ``bo_calls`` total) is
+    placed wherever EI is highest -- the posterior mean supplies "direction"
+    (best guess of where the score is lower) and the posterior uncertainty
+    supplies "scale" (how far it's worth exploring), replacing the ES's
+    hand-tuned step-size schedule with a model that's explicitly fit to
+    every evaluation seen so far, not just the two most recent scores.
+
+    Search space: log-uniform over ``bo_bounds`` (``k_multiplier`` is a
+    strictly-positive scale, same reasoning as the ES's log-space steps).
+    """
+    from skopt import gp_minimize
+    from skopt.space import Real
+
+    rows: List[dict] = []
+
+    def objective(x):
+        k = float(x[0])
+        row = evaluate_k(k, base_vector, counts, target_by_bucket, chart_mask,
+                         bucket_labels, calib)
+        rows.append(row)
+        if on_row:
+            on_row(row)
+        return row["score_rms_ratio_minus_1"]
+
+    lo, hi = float(calib.bo_bounds[0]), float(calib.bo_bounds[1])
+    print(f"=== BO: {calib.bo_calls} calls ({calib.bo_init_points} initial "
+          f"design) over k_multiplier in [{lo:g}, {hi:g}] (log-uniform) ===")
+    gp_minimize(
+        objective, [Real(lo, hi, prior="log-uniform", name="k_multiplier")],
+        n_calls=int(calib.bo_calls), n_initial_points=int(calib.bo_init_points),
+        acq_func="EI", random_state=int(calib.seed),
+    )
+
+    best_row = min(rows, key=lambda r: r["score_rms_ratio_minus_1"])
+    return rows, best_row
+
+
 def es_search(base_vector, counts, target_by_bucket, chart_mask, bucket_labels,
              calib, on_row=None):
     """(1+1) evolution strategy, Rechenberg's 1/5 success rule.
@@ -310,7 +358,7 @@ def main():
         print(f"NOTE: n_agents={calib.n_agents} is well past the n=200 the "
               f"~3 min/cell estimate elsewhere is based on -- time the first "
               f"evaluation before trusting any total-runtime estimate for "
-              f"the rest of the {'search' if calib.mode == 'es' else 'grid'}.")
+              f"the rest of the {'grid' if calib.mode == 'grid' else 'search'}.")
 
     buckets = load_target_buckets()
     counts = bucket_agent_counts(buckets, calib.n_agents)
@@ -334,7 +382,10 @@ def main():
         rows.append(row)
         pd.DataFrame(rows).to_csv(out_dir / "results.csv", index=False)
 
-    if calib.mode == "es":
+    if calib.mode == "bo":
+        _, best_row = bo_search(base_vector, counts, target_by_bucket,
+                                chart_mask, bucket_labels, calib, on_row=checkpoint)
+    elif calib.mode == "es":
         _, best_row = es_search(base_vector, counts, target_by_bucket,
                                 chart_mask, bucket_labels, calib, on_row=checkpoint)
     elif calib.mode == "grid":
@@ -343,7 +394,7 @@ def main():
                                   chart_mask, bucket_labels, calib))
         best_row = min(rows, key=lambda r: r["score_rms_ratio_minus_1"])
     else:
-        raise ValueError(f"unknown mode: {calib.mode!r} (expected 'es' or 'grid')")
+        raise ValueError(f"unknown mode: {calib.mode!r} (expected 'bo', 'es', or 'grid')")
 
     df = pd.DataFrame(rows)
     print(f"\nbest k_multiplier = {best_row['k_multiplier']:.4f} "

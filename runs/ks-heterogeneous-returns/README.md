@@ -100,49 +100,56 @@ real ~70% top-10% share.
 
 ## Search strategy
 
-Default `mode: es` — a (1+1) evolution strategy (Rechenberg's 1/5 success
-rule) instead of a flat grid, since a fixed grid wastes expensive evaluations
-(a full training run each, minutes to tens of minutes) on regions already
-known to be wrong. `k_multiplier` is a strictly-positive scale, so each
-proposal is multiplicative in log-space — `k_best * exp(step * randn())` —
-rather than additive: an improving move grows the step (be bolder, we're
-moving the right way), a rejected move shrinks it (be more cautious). The
-direction falls out of whichever side last improved, the scale is the
-adaptive step size, and the randomness is the proposal noise itself.
+Default `mode: bo` — Bayesian optimization (a Gaussian-process surrogate over
+every `(k_multiplier, score)` pair seen so far, next point placed by maximum
+expected improvement), via `scikit-optimize`'s `gp_minimize` (added to
+`requirements.txt`). `bo_init_points` (default 5) evaluations at
+random/quasi-random `k` build the initial GP fit; the remaining evaluations
+(up to `bo_calls`, default 13 total) go wherever EI is highest — the GP
+posterior mean supplies "direction" (best current guess of where the score is
+lower) and the posterior uncertainty supplies "scale" (how far it's worth
+exploring), fit to the *whole* history at once rather than reacting only to
+the last move. Search space: log-uniform over `bo_bounds` (default
+`[0.02, 2.0]`) — `k_multiplier` is a strictly-positive scale, so log-uniform
+is the natural prior, same reasoning as the ES's log-space steps below.
 
-`mode: grid` (the original flat sweep over `k_grid`) is still there — useful
-as a sanity-check baseline, or if the score surface turns out to have
-multiple local minima the (1+1)-ES could get stuck in (single-parameter
-+ unimodal-ish is the case it's suited to; it is not a global optimizer).
+`mode: es` — a (1+1) evolution strategy (Rechenberg's 1/5 success rule),
+the simpler predecessor to the BO mode: each proposal is multiplicative in
+log-space — `k_best * exp(step * randn())` — an improving move grows the
+step (be bolder), a rejected move shrinks it (be more cautious). No GP, no
+extra dependency, direction/scale come from a hand-tuned rule rather than a
+fitted model. Kept as a lighter-weight fallback and a cross-check: if BO and
+ES land on noticeably different `k_multiplier`, that's worth a look before
+trusting either.
 
-Bayesian optimization (fit a GP over every `(k, score)` pair, pick the next
-point by expected improvement) would be the more principled, sample-efficient
-alternative, and is worth revisiting if this becomes the two-parameter
-version from the earlier discussion (dispersion shape + scale) — a flat or
-adaptive-but-still-1-D search gets expensive fast in 2-D. Skipped for now:
-real added dependency (or a GP from scratch) for a problem that's currently
-one parameter.
+`mode: grid` — the original flat sweep over `k_grid`. Still there as a
+sanity-check baseline, and useful if the score surface turns out to have
+multiple local minima (neither BO's single GP nor the (1+1)-ES are global
+optimizers, though BO's exploration term makes it considerably more robust
+to this than ES).
 
 `results/results.csv` is rewritten after *every* evaluation, not just at the
 end — a multi-hour `n_agents=1000` run shouldn't lose everything to a Colab
-disconnect or a Ctrl-C partway through.
+disconnect or a Ctrl-C partway through. This applies to all three modes.
 
 ## Config interface
 
 `config.yaml` holds every script parameter (`base_exp`, `n_agents`,
-`num_envs`, `mode`, `k_grid`, `es_iters`/`es_step0`/`es_grow`/`es_shrink`/
-`es_k0`, `sim_steps`, `seed`, `device`, `total_timesteps`, `out_dir`), loaded
-via the same merge order as `jmbc.config.load_config`: structured dataclass
-defaults < `config.yaml` < CLI dotlist overrides (later wins). No argparse
-flags — overrides look exactly like the rest of the repo's CLI
-(`env.n_agents=1000` style, just without the `env.` prefix since this
-script's config is its own small `CalibrationConfig`, not `jmbc`'s
-`ExperimentConfig`):
+`num_envs`, `mode`, `bo_calls`/`bo_init_points`/`bo_bounds`, `k_grid`,
+`es_iters`/`es_step0`/`es_grow`/`es_shrink`/`es_k0`, `sim_steps`, `seed`,
+`device`, `total_timesteps`, `out_dir`), loaded via the same merge order as
+`jmbc.config.load_config`: structured dataclass defaults < `config.yaml` <
+CLI dotlist overrides (later wins). No argparse flags — overrides look
+exactly like the rest of the repo's CLI (`env.n_agents=1000` style, just
+without the `env.` prefix since this script's config is its own small
+`CalibrationConfig`, not `jmbc`'s `ExperimentConfig`):
 
 ```bash
-python calibrate_kappa_scale.py                          # config.yaml as-is (ES, n=1000)
+python calibrate_kappa_scale.py                          # config.yaml as-is (BO, n=1000)
 python calibrate_kappa_scale.py n_agents=500 device=cpu   # dotlist override
 python calibrate_kappa_scale.py num_envs=16               # override the envs count
+python calibrate_kappa_scale.py "bo_bounds=[0.05,1.0]" bo_calls=20
+python calibrate_kappa_scale.py mode=es                   # the (1+1)-ES fallback
 python calibrate_kappa_scale.py mode=grid "k_grid=[0.2,0.3]"
 python calibrate_kappa_scale.py config=variant.yaml       # a different file
 ```
@@ -195,7 +202,7 @@ simulated curve overlaid on the Xavier target curve.
 
 ```bash
 # Smoke test (CPU, tiny budget) -- validates the pipeline, not the economics:
-python calibrate_kappa_scale.py n_agents=100 "k_grid=[0.2,0.3]" \
+python calibrate_kappa_scale.py n_agents=100 num_envs=4 bo_calls=4 bo_init_points=2 \
     sim_steps=300 device=cpu total_timesteps=2000 out_dir=/tmp/smoke
 ```
 (quote list-valued overrides like `k_grid=[...]` — the shell would otherwise
