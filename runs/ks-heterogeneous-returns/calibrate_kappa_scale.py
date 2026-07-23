@@ -129,7 +129,16 @@ def bucket_agent_counts(buckets, n_agents: int):
 
 
 def build_base_vector(buckets, counts) -> np.ndarray:
-    """Ascending per-agent target-return vector: agent 0 = lowest bucket."""
+    """Ascending per-agent target-return vector: agent 0 = lowest bucket.
+
+    Units: plain percentage-point numbers straight from the CSV (3.6 means
+    3.6%, not 0.036 and not 3.6%-as-360). ``kappa_i = k_multiplier *
+    base_vector_i`` uses these as-is; k_multiplier is exactly the free
+    parameter that reconciles this arbitrary numeric scale (raw target
+    percentages, O(3-8)) with whatever scale kappa actually needs to be at
+    (O(1), to stay comparable to the homogeneous kappa≡1 baseline) --
+    there's no separate /100 anywhere because there doesn't need to be one.
+    """
     return np.concatenate([
         np.full(c, ret) for (_, _, ret, _), c in zip(buckets, counts)
     ])
@@ -158,13 +167,22 @@ def run_cell(k_multiplier: float, base_vector: np.ndarray, calib: CalibrationCon
     from jmbc.envs import build_env
     from jmbc.algos import make_train
     from jmbc.diagnostics import simulate
+    from jmbc.experiments.common import _print_launch_summary
+    from jmbc.recorder import phase
 
     env = build_env(cfg.env)
     train_fn = make_train(env, to_train_dict(cfg))
+    _print_launch_summary(cfg, env, train_fn, int(cfg.run.seed))  # confirms
+    # NUM_ENVS/n_agents/batch shapes actually being used -- don't guess from
+    # how slow it feels, read it here every cell.
+
     rng = jax.random.PRNGKey(int(cfg.run.seed))
+    phase("training ...")
     out = train_fn(rng)
+    phase("training done -- simulating steady-state rollout ...")
     rec = simulate(env, train_fn.network, out["params"],
                    jax.random.PRNGKey(7), n_steps=calib.sim_steps)
+    phase("simulation done")
     return rec, float(cfg.env.delta)
 
 
