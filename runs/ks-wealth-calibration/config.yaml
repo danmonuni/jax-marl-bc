@@ -1,0 +1,19 @@
+# SweepConfig defaults for sweep_lognormal.py. CLI dotlist overrides win over
+# this file (e.g. `python sweep_lognormal.py n_agents=100 device=cpu`); a
+# different file entirely via `config=<path>`.
+
+base_exp: ks_n200   # only env.n_agents/num_envs are overridden -- see the
+                    # sibling ks-heterogeneous-{returns,wealth} scripts
+
+n_agents: 500
+num_envs: 8
+
+# Grid search over sigma, per Aldo's guidance: mean(kappa) held at 1
+# (mu = -sigma^2/2), sigma swept from 0 (homogeneous) to 1 (wide spread).
+sigmas: [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+
+sim_steps: 5000
+seed: 0
+device: gpu
+save_raw: all   # every sigma is a deliberate design point, not a search --
+                # keep every cell's raw rollout + trained params
