@@ -1,8 +1,7 @@
+abbreviare i bullet point della todo list, aggiungere il dashboard, agentificazione, e calibration
 
-stessa figura:
+controllare se effettivamente il modello supporta lambda eterogenei, dividere la sezione 3 in due sottoseionei modello e jax implementation
 
-- figura scaling vs n_agents: jax-marl-on-gpu, jax-marl-on-cpu, marlbc-on-cpu (sia ppo che sac)
-  dati marlbc-on-cpu (sia ppo che sac): 
 
 
 
