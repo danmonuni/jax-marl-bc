@@ -1,0 +1,22 @@
+# SweepConfig defaults for sweep_lognormal_random.py. CLI dotlist overrides
+# win over this file (e.g. `python sweep_lognormal_random.py n_agents=100
+# device=cpu`), or point at a different file entirely via `config=<path>`.
+
+base_exp: ks_n200   # only env.n_agents/num_envs are overridden -- see the
+                    # sibling ks-wealth-calibration script
+
+n_agents: 500
+num_envs: 8
+
+# Same sigma grid as the sibling ks-wealth-calibration sweep: mean(kappa)
+# held at 1 (mu = -sigma^2/2), sigma swept from 0 (homogeneous) to 1 (wide
+# spread). Unlike the sibling, kappas here are i.i.d.-sampled rather than a
+# deterministic quantile mesh, so the grid also sweeps a list of seeds at
+# every sigma -- see the module docstring / README for why.
+sigmas: [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+seeds: [0, 1, 2, 3, 4]
+
+sim_steps: 5000
+device: gpu
+save_raw: all   # every (sigma, seed) cell's raw rollout + trained params is
+                # kept, not just some subset
