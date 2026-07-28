@@ -44,26 +44,46 @@ given sigma looks like, a list of **seeds** is swept at every **sigma**.
 `(sigma, seed)` cell is trained and kept; none is treated as more
 representative than another.
 
-## Config
+## Config — a cell *is* `ks_n200_top`
 
-`base_exp: ks_n200` (same protocol as v2 and the calibration siblings),
-`n_agents: 500`, `num_envs: 8` (batch width `W = 4,000`, inside the compute
-plateau the paper's scaling mesh measured). `sigmas: [0.0, 0.2, 0.4, 0.6,
-0.8, 1.0]` x `seeds: [0, 1, 2, 3, 4]` = 30 cells.
+The single run is the reference run `runs/ks-correctness/ks_n200_top/` with
+**exactly two** deliberate changes: the capital initialization and the kappa
+vector. Verified by diffing the resolved config against that run's own
+`config.yaml` — the only keys that differ are `env.kappas` and the
+`env.k_init_*` fields.
 
-`base_exp` resolves through `configs/exp/ks.yaml`, which **pins
-`k_init_dist: constant`** so the older runs stay bit-reproducible. This sweep
-therefore overrides the initialization explicitly per cell, from the
-`k_init_*` fields in `config.yaml`.
+> This is a change from **v2**, which ran `n_agents: 500` / `num_envs: 8`
+> (batch width 4,000). v3 uses the reference's `200` / `32` — batch width
+> 6,400, 1,280,000 transitions per update. A v2-vs-v3 comparison therefore
+> differs in population as well as initialization.
+
+Rather than inherit silently from `base_exp`, every hyperparameter is declared
+in the `protocol:` block of `config.yaml` and applied as an explicit override.
+`verify_protocol()` re-checks the resolved config against every one of those
+values before each cell trains, so a future edit to `configs/exp/ks*.yaml` or
+to the schema cannot quietly change what this experiment runs — it fails
+loudly instead. The launch output prints the whole protocol, with the two
+deliberate deviations flagged as such.
+
+The initialization needs an explicit override because `base_exp` resolves
+through `configs/exp/ks.yaml`, which **pins `k_init_dist: constant`** to keep
+older runs bit-reproducible.
+
+`sigmas: [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]` x `seeds: [0, 1, 2, 3, 4]` = 30 cells.
 
 ```bash
-python sweep_lognormal_random_3.py                      # config.yaml as-is
-python sweep_lognormal_random_3.py n_agents=100 device=cpu sigmas=[0.0,0.5] seeds=[0,1]
-python sweep_lognormal_random_3.py k_init_dist=constant # v2's initialization, for an A/B
+python sweep_lognormal_random_3.py                       # config.yaml as-is
+python sweep_lognormal_random_3.py device=cpu "sigmas=[0.0,0.5]" "seeds=[0,1]"
+python sweep_lognormal_random_3.py protocol.env.n_agents=100   # a protocol entry
+python sweep_lognormal_random_3.py k_init_dist=constant  # == ks_n200_top exactly
 ```
 
-That last form is the cleanest way to isolate the initialization: same kappa
-design, same seeds, only `k_init_dist` differs.
+Protocol entries are addressed nested (`protocol.train.num_envs=8`), not
+dotted-flat — a flat key would have OmegaConf create a second key beside it
+and leave the original silently in force.
+
+That last form is the cleanest isolation of the change: with
+`k_init_dist=constant` and `sigma=0`, a cell reproduces `ks_n200_top` itself.
 
 ## Outputs
 

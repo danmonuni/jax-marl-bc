@@ -23,10 +23,19 @@ beta=0.95 used here K* ~ 11.7. Note this starts the economy NEAR its steady
 state, whereas the old constant k_init=1.0 started it at ~0.085x -- so the
 burn-in has less transient to absorb, not more.
 
+A cell is the reference run ks_n200_top with EXACTLY TWO changes: the capital
+initialization and the kappa vector. Every hyperparameter of that run is
+declared explicitly in PROTOCOL below and applied as an override rather than
+inherited from base_exp, and verify_protocol() re-asserts the resolved config
+against it before each cell trains -- so a later edit to configs/exp/ks*.yaml
+cannot quietly change what this experiment runs. Note this differs from v2,
+which used n_agents=500 / num_envs=8 rather than the reference's 200 / 32.
+
 Usage (same config.yaml + CLI-dotlist convention as the sibling experiments):
     python sweep_lognormal_random_3.py
-    python sweep_lognormal_random_3.py n_agents=100 device=cpu sigmas=[0.0,0.5] seeds=[0,1]
-    python sweep_lognormal_random_3.py k_init_dist=constant   # v2's initialization
+    python sweep_lognormal_random_3.py device=cpu "sigmas=[0.0,0.5]" "seeds=[0,1]"
+    python sweep_lognormal_random_3.py protocol.env.n_agents=100   # protocol entry
+    python sweep_lognormal_random_3.py k_init_dist=constant        # = ks_n200_top
 """
 from __future__ import annotations
 
@@ -35,7 +44,7 @@ import shutil
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 from omegaconf import OmegaConf
@@ -48,22 +57,74 @@ if str(REPO_ROOT) not in sys.path:
 DEFAULT_CONFIG_PATH = HERE / "config.yaml"
 
 
+#: Every hyperparameter of the single run, spelled out rather than inherited.
+#: These are the resolved values of the reference run ks_n200_top (its own
+#: config.yaml, kept at runs/ks-correctness/ks_n200_top/config.yaml), so a
+#: cell of this sweep is that run with only the capital initialization and the
+#: kappa vector changed. Applied as explicit CLI-style overrides on top of
+#: base_exp, so nothing that matters is silently inherited: if base_exp ever
+#: drifts, these still pin the protocol, and verify_protocol() below fails
+#: loudly if the resolved config disagrees with any of them.
+#: Nested, not dotted-flat, so that a CLI dotlist override addresses an entry
+#: naturally (``protocol.train.num_envs=8``). A flat {"train.num_envs": 32}
+#: would instead have OmegaConf create a SECOND, nested key beside the flat
+#: one, leaving the flat value stale and silently in force.
+PROTOCOL: Dict[str, Any] = {
+    "env": {
+        "n_agents":        200,
+        "alpha":           0.36,
+        "beta":            0.95,
+        "delta":           0.025,
+        "max_steps":       5000,
+    },
+    "train": {
+        "num_envs":        32,
+        "rollout_len":     200,
+        "total_timesteps": 128000,
+        "update_epochs":   4,
+        "num_minibatches": 64,
+        "lr":              3.0e-4,
+        "gamma":           0.95,
+        "gae_lambda":      0.95,
+        "clip_eps":        0.2,
+        "vf_coef":         0.5,
+        "ent_coef":        0.0,
+        "anneal_lr":       True,
+        "max_grad_norm":   0.5,
+    },
+    "net": {
+        "activation":      "tanh",
+    },
+}
+
+
+def flatten(d, prefix: str = "") -> Dict[str, Any]:
+    """{'train': {'lr': 3e-4}} -> {'train.lr': 3e-4} for dotlist overrides."""
+    out: Dict[str, Any] = {}
+    for k, v in d.items():
+        key = f"{prefix}{k}"
+        if hasattr(v, "items"):
+            out.update(flatten(v, key + "."))
+        else:
+            out[key] = v
+    return out
+
+
 @dataclass
 class SweepConfig:
-    base_exp: str = "ks_n200"      # configs/exp/<base_exp>.yaml -- same protocol
-                                    # as the sibling calibration scripts, only
-                                    # n_agents/num_envs are overridden below
-    n_agents: int = 500
-    num_envs: Optional[int] = 8    # W = num_envs * n_agents = 4,000 at n=500,
-                                    # inside the 4k-20k compute-plateau the
-                                    # paper's own scaling mesh measured (see
-                                    # sibling scripts' "Batch width" note)
+    base_exp: str = "ks_n200"      # configs/exp/<base_exp>.yaml -- the PROTOCOL
+                                    # dict above re-pins every value that
+                                    # matters, so this only supplies obs_vars,
+                                    # net.hidden_dims and other untouched keys
+    # Full single-run spec, explicit. Defaults to PROTOCOL (= ks_n200_top);
+    # override individual entries from config.yaml or the CLI, e.g.
+    # `protocol.train.num_envs=8`.
+    protocol: Dict[str, Any] = field(default_factory=lambda: dict(PROTOCOL))
     sigmas: List[float] = field(
         default_factory=lambda: [0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
     seeds: List[int] = field(default_factory=lambda: [0, 1, 2, 3, 4])
     sim_steps: int = 5000
     device: str = "gpu"
-    total_timesteps: Optional[int] = None   # None -> base_exp's own budget
     out_dir: str = "results"
     save_raw: str = "all"          # every (sigma, seed) cell's raw rollout +
                                     # trained params is kept, not just some
@@ -114,28 +175,66 @@ def build_kappas(n_agents: int, sigma: float, seed: int) -> np.ndarray:
     return kappas / kappas.mean()
 
 
+def _fmt(v) -> str:
+    """OmegaConf dotlist rendering (bools lowercase, floats unabbreviated)."""
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    return str(v)
+
+
+def build_overrides(seed: int, sweep: SweepConfig) -> List[str]:
+    """Every override applied to base_exp, in one place.
+
+    PROTOCOL first (the full single-run spec), then the two things this
+    experiment deliberately varies -- the capital initialization and the
+    per-cell seed -- so the deliberate deviations are visible as exactly
+    that, rather than buried among inherited defaults.
+    """
+    return (
+        [f"{k}={_fmt(v)}" for k, v in flatten(sweep.protocol).items()]
+        + [
+            # Starting capital: base_exp pins `constant` to keep older runs
+            # reproducible, so the initialization under test is set here.
+            f"env.k_init_dist={sweep.k_init_dist}",
+            f"env.k_init_low={sweep.k_init_low}",
+            f"env.k_init_high={sweep.k_init_high}",
+            f"env.k_init_resample={sweep.k_init_resample}",
+            # Per-cell.
+            f"run.seed={seed}",
+            f"run.device={sweep.device}",
+            f"diag.sim_steps={sweep.sim_steps}",
+        ]
+    )
+
+
+def verify_protocol(cfg, sweep: SweepConfig) -> None:
+    """Fail loudly if the resolved config disagrees with PROTOCOL.
+
+    The overrides above should make this impossible, which is the point: it
+    is a standing assertion that a cell really is ks_n200_top, so a future
+    edit to configs/exp/ks*.yaml (or to the schema) cannot quietly change
+    what this experiment trains.
+    """
+    from omegaconf import OmegaConf
+
+    bad = []
+    for key, want in flatten(sweep.protocol).items():
+        got = OmegaConf.select(cfg, key)
+        if str(got) != str(want):
+            bad.append(f"  {key}: resolved {got!r}, protocol says {want!r}")
+    if bad:
+        raise SystemExit(
+            "resolved config does not match the declared protocol:\n"
+            + "\n".join(bad)
+        )
+
+
 def run_cell(kappas: np.ndarray, seed: int, sweep: SweepConfig):
     """Train one KS run at this kappa vector; return (rec, cfg, params, network)."""
     from jmbc.config import load_config, to_train_dict, setup_device
 
-    n_agents = len(kappas)
-    overrides = [
-        f"env.n_agents={n_agents}",
-        "diag.n_snapshots=1",
-        f"diag.sim_steps={sweep.sim_steps}",
-        f"run.seed={seed}",
-        f"run.device={sweep.device}",
-        # Starting capital: override base_exp's pinned `constant` (see README).
-        f"env.k_init_dist={sweep.k_init_dist}",
-        f"env.k_init_low={sweep.k_init_low}",
-        f"env.k_init_high={sweep.k_init_high}",
-        f"env.k_init_resample={sweep.k_init_resample}",
-    ]
-    if sweep.total_timesteps:
-        overrides.append(f"train.total_timesteps={sweep.total_timesteps}")
-    if sweep.num_envs:
-        overrides.append(f"train.num_envs={sweep.num_envs}")
-    cfg = load_config(sweep.base_exp, overrides)
+    cfg = load_config(sweep.base_exp, build_overrides(seed, sweep))
+    verify_protocol(cfg, sweep)
     cfg.env.kappas = kappas.tolist()
     setup_device(cfg.run.device, bool(cfg.run.prealloc))  # before jax import
 
@@ -174,7 +273,7 @@ def evaluate_cell(sigma: float, seed: int, sweep: SweepConfig):
     """Train + simulate at this (sigma, seed); return (row, artifacts)."""
     from jmbc.diagnostics import gini, top_shares, economic_report
 
-    kappas = build_kappas(sweep.n_agents, sigma, seed)
+    kappas = build_kappas(int(sweep.protocol["env"]["n_agents"]), sigma, seed)
     print(f"\n=== sigma={sigma:.3f} seed={seed}  (mu={-0.5*sigma**2:.4f}, "
           f"mean kappa={kappas.mean():.4f}, "
           f"min/max={kappas.min():.3f}/{kappas.max():.3f}) ===")
@@ -237,6 +336,14 @@ def save_raw(raw_dir: Path, tag: str, artifacts: dict):
 def main():
     sweep = load_sweep_config()
     print(f"config: {OmegaConf.to_yaml(sweep)}")
+    print("single-run protocol (= runs/ks-correctness/ks_n200_top/config.yaml; "
+          "asserted per cell by verify_protocol):")
+    for k, v in flatten(sweep.protocol).items():
+        print(f"  {k:<24} {v}")
+    print(f"  {'env.k_init_dist':<24} {sweep.k_init_dist}   <- differs from "
+          f"ks_n200_top (constant k_init) -- the change under test")
+    print(f"  {'env.kappas':<24} i.i.d. LogNormal per cell   <- differs from "
+          f"ks_n200_top (homogeneous)")
     n_cells = len(sweep.sigmas) * len(sweep.seeds)
     print(f"NOTE: {len(sweep.sigmas)} sigmas x {len(sweep.seeds)} seeds = "
           f"{n_cells} cells -- time the first cell before trusting any "
