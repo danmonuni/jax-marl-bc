@@ -1,0 +1,34 @@
+# SweepConfig defaults for sweep_lognormal_random_3.py. CLI dotlist overrides
+# win over this file (e.g. `python sweep_lognormal_random_3.py n_agents=100
+# device=cpu`), or point at a different file entirely via `config=<path>`.
+
+base_exp: ks_n200   # only env.n_agents/num_envs and the k_init_* fields below
+                    # are overridden -- see the sibling ks-wealth-lognormal-random
+
+n_agents: 500
+num_envs: 8
+
+# Same sigma grid and seed list as v2 (ks-wealth-lognormal-random), unchanged
+# on purpose: the economic design is held fixed so that the only difference
+# from v2 is the starting-capital initialization below. mean(kappa) held at 1
+# (mu = -sigma^2/2), sigma swept from 0 (homogeneous) to 1 (wide spread),
+# kappas i.i.d.-sampled rather than on a quantile mesh, so a list of seeds is
+# swept at every sigma.
+sigmas: [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+seeds: [0, 1, 2, 3, 4]
+
+# THE CHANGE UNDER TEST. Agents used to all start at k_init=1.0; they now get
+# an independent draw per agent, redrawn at every episode reset (the reference
+# KS initialization). U(3, 20) is the reference's U(10, 70) rescaled to this
+# repo's steady state: it spans 0.25x-1.75x of K*, and K* ~ 11.7 at beta=0.95
+# (vs K* ~ 40 at the beta=0.99 the reference bounds assume).
+# Set k_init_dist: constant to reproduce v2's initialization instead.
+k_init_dist: uniform
+k_init_low: 3.0
+k_init_high: 20.0
+k_init_resample: per_episode
+
+sim_steps: 5000
+device: gpu
+save_raw: all   # every (sigma, seed) cell's raw rollout + trained params is
+                # kept, not just some subset
