@@ -35,11 +35,12 @@ def plot_ks_lom_evolution(recs: List[dict], snap_steps: Sequence[float], path: s
     progress; solid = good state, dashed = bad). Middle: one-step R^2 and the
     Den Haan dynamic-forecast error vs training steps. Right: fitted (a, b)."""
     import matplotlib.pyplot as plt
-    from matplotlib import cm, colors as mcolors
+    from matplotlib import cm
+    from matplotlib import colors as mcolors
     apply_style()
 
     S = len(recs)
-    cmap = cm.get_cmap("viridis")
+    cmap = plt.get_cmap("viridis")
     norm = mcolors.Normalize(0, max(S - 1, 1))
 
     fits, r2s, dh_mean, dh_max = [], [], [], []
