@@ -7,6 +7,11 @@ env:
   delta: 0.025
   max_steps: 5000
   k_init: 1.0
+  # Every agent starts at k_init. Pinned explicitly: this is what all runs
+  # through 2026-07 (including the numbers in the paper draft) did, back when
+  # constant initialization was the only option. Drop this line to inherit the
+  # default: U(3, 20) per agent, redrawn at every episode reset.
+  k_init_dist: constant
   # `labour` = own employment status x productivity: without it the policy
   # cannot condition consumption on being unemployed (no precautionary motive).
   obs_vars: [capital, labour, mean_capital, aggregate_state, kappa, lambda]

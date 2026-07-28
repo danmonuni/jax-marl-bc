@@ -6,6 +6,7 @@ extends: ks
 
 env:
   n_agents: 2000
+  k_init_dist: constant     # as-run: every agent starts at k_init (inherited from ks)
 
 train:
   num_envs: 32

@@ -26,6 +26,25 @@ class EnvConfig:
     sigma: float = 0.01                     # TFP AR(1) innovation std (RBC only)
     max_steps: int = 1000
     k_init: float = 0.1
+    # Starting capital, drawn once per parallel env and persisted across
+    # in-training episode resets. "constant" = every agent at k_init (the
+    # pre-randomization default). See jmbc/envs/init_capital.py.
+    k_init_dist: str = "uniform"            # "constant" | "uniform" | "lognormal"
+    # When a new population is drawn. "per_episode": redrawn at every reset, as
+    # the reference implementation does -- the policy then sees num_envs x
+    # n_episodes distinct starting populations rather than just num_envs.
+    # "per_env": drawn once per parallel env and reused on every reset, i.e. one
+    # fixed initial wealth distribution per simulation. Costs ~0.3% of training
+    # either way (the reset body is computed every step regardless).
+    k_init_resample: str = "per_episode"    # "per_episode" | "per_env"
+    k_init_sigma: float = 0.0               # lognormal dispersion
+    # Uniform support, bracketing the steady state as the reference KS
+    # initialization U(10, 70) does. The reference spans 0.25x-1.75x of K* ~ 40
+    # (its beta=0.99 steady state); these bounds keep those proportions at THIS
+    # repo's beta=0.95, where K* ~ 11.7. Rescale again if beta moves:
+    #   r* = 1/beta - 1 + delta ;  K* = (alpha/r*)^(1/(1-alpha)) * L
+    k_init_low: float = 3.0
+    k_init_high: float = 20.0
     obs_vars: List[str] = field(default_factory=lambda: ["capital"])
     # Per-agent heterogeneity. None -> filled with ones of length n_agents.
     kappas: Optional[List[float]] = None    # capital productivity weights

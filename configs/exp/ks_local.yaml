@@ -3,7 +3,10 @@
 # iterate on diagnostics/figures locally; use exp=ks for the full run (Colab).
 extends: ks
 
+env:
+  k_init_dist: constant     # as-run: every agent starts at k_init (inherited from ks)
+
 train:
-  total_timesteps: 60000    # 300 updates x ~0.7 s/update + compile + diagnostics
+  total_timesteps: 60000   # 300 updates x ~0.7 s/update + compile + diagnostics
                             # ~= 5 min on an 8-core laptop CPU (vs 500k for exp=ks)
   log_every: 50

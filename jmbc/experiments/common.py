@@ -18,6 +18,16 @@ from ..envs import build_env
 from ..recorder import RunRecorder, run_and_time, benchmark_time, phase
 
 
+def _k_init_desc(env_cfg) -> str:
+    """One-line description of the starting-capital distribution."""
+    d = env_cfg.k_init_dist
+    if d == "constant":
+        return f"{env_cfg.k_init:g} (constant)"
+    spec = (f"U({env_cfg.k_init_low:g}, {env_cfg.k_init_high:g})" if d == "uniform"
+            else f"LN(mean={env_cfg.k_init:g}, sigma={env_cfg.k_init_sigma:g})")
+    return f"{spec} per agent, resampled {env_cfg.k_init_resample}"
+
+
 def _print_launch_summary(cfg, env, train_fn, seed: int) -> None:
     """What is ACTUALLY about to run: values pulled from the built env, the
     derived training config and the initialized network — not the YAML."""
@@ -56,7 +66,7 @@ def _print_launch_summary(cfg, env, train_fn, seed: int) -> None:
         ("economy", f"{cfg.env.kind} | {n} agents | obs[{env.obs_dim}]: "
                     f"{', '.join(env.obs_vars)}"),
         ("",        f"alpha {cfg.env.alpha} | beta {cfg.env.beta} | delta {cfg.env.delta}"
-                    f" | episode {env.max_steps} steps | k_init {cfg.env.k_init}"),
+                    f" | episode {env.max_steps} steps | k_0 {_k_init_desc(cfg.env)}"),
         ("training", f"{c['NUM_UPDATES']:,} updates = {seq_steps:,} sequential steps"
                      f" | {E} envs x {n} agents -> {seq_steps * E * n:,} transitions"),
         ("",         f"batch/update {R * E * n:,} | minibatch {c['MINIBATCH_SIZE']:,}"

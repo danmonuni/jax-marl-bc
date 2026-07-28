@@ -12,6 +12,7 @@ env:
   sigma: 0.01
   max_steps: 1000
   k_init: 1.0
+  k_init_dist: constant     # pre-2026-08 behavior: every agent starts at k_init
   obs_vars: [capital]
 
 train:

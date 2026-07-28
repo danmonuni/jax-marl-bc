@@ -10,6 +10,8 @@ from jaxmarl.environments.multi_agent_env import MultiAgentEnv, State
 from jaxmarl.environments.spaces import Box
 from jaxmarl.wrappers.baselines import LogWrapper
 
+from .init_capital import split_and_draw_k_init
+
 @struct.dataclass
 class RBCKLState(State):          # inherits: done: Array, step: int
     ks:      chex.Array           # [n] capitals
@@ -19,6 +21,7 @@ class RBCKLState(State):          # inherits: done: Array, step: int
     incomes: chex.Array           # [n]
     ls:      chex.Array           # [n] labour chosen last step
     key:     chex.PRNGKey
+    k_init_vec: chex.Array        # [n] starting capital, persisted across resets
 
 class RBCKLEnv(MultiAgentEnv):
     """
@@ -35,13 +38,18 @@ class RBCKLEnv(MultiAgentEnv):
     def __init__(self, n_agents, kappas, lambdas,
                  alpha=0.36, delta=0.025, beta=0.95, b=5.0,
                  rho=0.9, sigma=0.01, max_steps=1000, k_init=0.1,
-                 obs_vars=("wealth",)):
+                 k_init_dist="constant", k_init_resample="per_episode", k_init_sigma=0.0,
+                 k_init_low=0.0, k_init_high=0.0, obs_vars=("wealth",)):
         super().__init__(n_agents)
         self.kappas    = jnp.asarray(kappas,  jnp.float32)
         self.lambdas   = jnp.asarray(lambdas, jnp.float32)
         self.alpha, self.delta, self.beta = alpha, delta, beta
         self.b, self.rho, self.sigma = b, rho, sigma
         self.max_steps, self.k_init  = max_steps, k_init
+        self.k_init_dist  = str(k_init_dist)
+        self.k_init_resample = str(k_init_resample)
+        self.k_init_sigma = float(k_init_sigma)
+        self.k_init_low, self.k_init_high = float(k_init_low), float(k_init_high)
         self.obs_vars  = tuple(obs_vars)
         self.obs_dim   = len(obs_vars)
         self.act_dim   = 2
@@ -56,23 +64,42 @@ class RBCKLEnv(MultiAgentEnv):
 
     @partial(jax.jit, static_argnums=(0,))
     def reset_mat(self, key):
+        """Fresh episode with a NEW starting-capital draw. Called once per
+        parallel env (and per diagnostics rollout), never on auto-reset."""
+        key, k_init_vec = split_and_draw_k_init(
+            key, self.num_agents, self.k_init, self.k_init_dist,
+            self.k_init_sigma, self.k_init_low, self.k_init_high)
+        return self._reset_with_k_init(key, k_init_vec)
+
+    @partial(jax.jit, static_argnums=(0,))
+    def _reset_with_k_init(self, key, k_init_vec):
+        """Reset onto a GIVEN starting population (capital carried in)."""
         key, sk = jax.random.split(key)
-        ks  = jnp.full((self.num_agents,), self.k_init, jnp.float32)
+        ks  = k_init_vec
         z   = jnp.zeros((), jnp.float32)
         ls  = jnp.full((self.num_agents,), 0.33, jnp.float32)
         w   = ks * (1.0 - self.delta + self.alpha)
         state = RBCKLState(done=jnp.bool_(False), step=0,
                            ks=ks, z=z, A=jnp.exp(z), wealths=w,
                            incomes=jnp.zeros(self.num_agents, jnp.float32),
-                           ls=ls, key=sk)
+                           ls=ls, key=sk, k_init_vec=k_init_vec)
         return self._obs_matrix(state), state
+
+    @partial(jax.jit, static_argnums=(0,))
+    def _auto_reset(self, key, state: RBCKLState):
+        """End-of-episode reset. "per_episode" (default) draws a new population,
+        as the reference implementation does; "per_env" restarts the same one
+        this env began with. Static branch, resolved at trace time."""
+        if self.k_init_resample == "per_episode":
+            return self.reset_mat(key)
+        return self._reset_with_k_init(key, state.k_init_vec)
 
     @partial(jax.jit, static_argnums=(0,))
     def step_mat(self, key, state: RBCKLState, acts):
         """Auto-resetting step on arrays; mirrors MultiAgentEnv.step()."""
         key, key_reset = jax.random.split(key)
         obs_st, st_st, rews, done = self._step_core(key, state, acts)
-        obs_re, st_re = self.reset_mat(key_reset)
+        obs_re, st_re = self._auto_reset(key_reset, state)
         st = jax.tree.map(lambda x, y: lax.select(done, x, y), st_re, st_st)
         obs = lax.select(done, obs_re, obs_st)
         return obs, st, rews, done
@@ -83,6 +110,16 @@ class RBCKLEnv(MultiAgentEnv):
     def reset(self, key):
         obs_mat, state = self.reset_mat(key)
         return {a: obs_mat[i] for i, a in enumerate(self.agents)}, state
+
+    @partial(jax.jit, static_argnums=(0,))
+    def step(self, key, state: RBCKLState, actions, reset_state=None):
+        """Auto-reset through _auto_reset, exactly as step_mat does. The base
+        class would unconditionally call reset() here, which always redraws and
+        so would ignore k_init_resample, diverging from the vector path."""
+        if reset_state is None:
+            _, key_reset = jax.random.split(key)
+            _, reset_state = self._auto_reset(key_reset, state)
+        return super().step(key, state, actions, reset_state)
 
     @partial(jax.jit, static_argnums=(0,))
     def get_obs(self, state: RBCKLState) -> Dict[str, chex.Array]:
@@ -123,7 +160,8 @@ class RBCKLEnv(MultiAgentEnv):
 
         new_state = RBCKLState(done=done, step=step_new,
                                ks=ks_new, z=z_new, A=jnp.exp(z_new),
-                               wealths=w, incomes=ws*ls+rs*state.ks, ls=ls, key=key)
+                               wealths=w, incomes=ws*ls+rs*state.ks, ls=ls, key=key,
+                               k_init_vec=state.k_init_vec)
         return self._obs_matrix(new_state), new_state, rews, done
 
     def _obs_matrix(self, state):

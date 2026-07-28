@@ -10,6 +10,7 @@ from typing import List, Sequence
 import numpy as np
 
 from ..config.schema import EnvConfig
+from . import init_capital
 from .env_std import RBCKLEnv
 from .env_ksmf import RBCKSEnv
 
@@ -31,20 +32,25 @@ def build_env(cfg: EnvConfig):
     n = int(cfg.n_agents)
     kappas = _resolve_weights(cfg.kappas, n)
     lambdas = _resolve_weights(cfg.lambdas, n)
+    init_capital.validate(cfg.k_init_dist, cfg.k_init_sigma,
+                          cfg.k_init_low, cfg.k_init_high)
+    k_spec = dict(k_init_dist=cfg.k_init_dist, k_init_sigma=cfg.k_init_sigma,
+                  k_init_resample=cfg.k_init_resample,
+                  k_init_low=cfg.k_init_low, k_init_high=cfg.k_init_high)
 
     if cfg.kind == "rbc":
         return RBCKLEnv(
             n_agents=n, kappas=kappas, lambdas=lambdas,
             alpha=cfg.alpha, delta=cfg.delta, beta=cfg.beta, b=cfg.b,
             rho=cfg.rho, sigma=cfg.sigma, max_steps=cfg.max_steps,
-            k_init=cfg.k_init, obs_vars=tuple(cfg.obs_vars),
+            k_init=cfg.k_init, obs_vars=tuple(cfg.obs_vars), **k_spec,
         )
     if cfg.kind == "ks":
         return RBCKSEnv(
             n_agents=n, kappas=kappas, lambdas=lambdas,
             alpha=cfg.alpha, delta=cfg.delta, beta=cfg.beta,
             max_steps=cfg.max_steps, k_init=cfg.k_init,
-            obs_vars=tuple(cfg.obs_vars),
+            obs_vars=tuple(cfg.obs_vars), **k_spec,
         )
     raise ValueError(f"Unknown env kind: {cfg.kind!r} (expected 'rbc' or 'ks')")
 
