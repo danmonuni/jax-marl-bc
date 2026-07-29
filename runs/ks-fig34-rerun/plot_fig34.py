@@ -66,9 +66,12 @@ COLORS = {
     "bad":        "#2a78d6",   # blue   -- bad aggregate state
     "employed":   "#4a3aa7",   # violet -- employed
     "unemployed": "#1baf7a",   # aqua   -- unemployed
-    # The capital histogram is a lone series carrying no identity, so it stays
-    # neutral: colouring it would claim membership in one of the pairs above.
-    "hist":       "#7f8894",
+    # The capital histogram is a lone series, so its colour only has to avoid
+    # claiming membership in either pair above. A deep rose is the one hue
+    # that stays clear of all four as a fifth slot (all-pairs CVD ΔE 8.4,
+    # normal-vision 15.0); the palette's own magenta and yellow both collide
+    # with orange below the normal-vision floor.
+    "hist":       "#b8567f",
 }
 
 #: Wording for the recurring symbols, in the standards' "Description,
