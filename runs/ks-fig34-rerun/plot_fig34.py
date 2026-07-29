@@ -124,7 +124,7 @@ MODES = {
     "pooled": {
         "slug":   "pooled",
         "bins3":  40, "bins4": 60,
-        "label3": LABELS["k_i"] + " (all agent-steps of the last {w})",
+        "label3": LABELS["k_i"],
         "label4": LABELS["wealth"],
     },
 }
@@ -258,27 +258,33 @@ def plot_fig3(d: dict, window: int, path: Path, mode: str = "timeavg") -> None:
 
     # A -- aggregate law of motion, one fit per aggregate state.
     gs_left = gs_outer[0].subgridspec(2, 2, hspace=0.55, wspace=0.45)
+    lom_axes = []
+    import matplotlib.patches as mpatches
     for i, s in enumerate(d["sel"][:4]):
         ax = fig.add_subplot(gs_left[i // 2, i % 2])
+        lom_axes.append(ax)
+        fits = []
         K = stationary_slice(d["K"][s], BURN_FRAC)
         agg = stationary_slice(d["agg_state"][s], BURN_FRAC)
         Kt, Kt1, agt = K[:-1], K[1:], agg[:-1]
+        legend_patches = []
         for state, colour, ls, lab in ((1, COLORS["good"], "-", "Good"),
                                        (0, COLORS["bad"], "--", "Bad")):
             m = agt == state
-            ax.scatter(Kt[m], Kt1[m], s=4, alpha=0.4, color=colour,
-                       label=f"{lab} state")
+            ax.scatter(Kt[m], Kt1[m], s=4, alpha=0.4, color=colour)
             if m.sum() < 3:
                 continue
             slope, intercept, r, *_ = sp_stats.linregress(Kt[m], Kt1[m])
             x_r = np.linspace(Kt[m].min(), Kt[m].max(), 100)
-            ax.plot(x_r, slope * x_r + intercept, color=colour, ls=ls, lw=1.2,
-                    label=f"{lab} state fit, $R^2 = {r ** 2:.3f}$")
+            ax.plot(x_r, slope * x_r + intercept, color=colour, ls=ls, lw=1.2)
+            legend_patches.append(mpatches.Patch(color=colour, label=f"{lab} $R^2={r ** 2:.3f}$"))
+        if legend_patches:
+            ax.legend(handles=legend_patches, loc='upper left', fontsize=7, 
+                      framealpha=0.8, edgecolor='none', handlelength=0.7, handleheight=0.7)
         ax.set_xlabel(LABELS["K_t"], fontsize=8)
         ax.set_ylabel(LABELS["K_next"], fontsize=8)
         ax.set_title(f"After {sci(d['env_steps'][s])} training env steps",
                      fontsize=9)
-        ax.legend(fontsize=7)
         ax.tick_params(labelsize=8)
 
     # B -- cross-sectional capital over the last `window` steps.
@@ -362,14 +368,17 @@ def plot_fig4(d: dict, window: int, path: Path, mode: str = "timeavg") -> None:
                          norm=mcolors.LogNorm(vmin=floor,
                                               vmax=dens.max() + 1e-12))
     ax.plot(steps, ws.mean(axis=1), color="cyan", marker="o", markersize=3.5,
-            lw=1.2, label="Mean wealth")
+            lw=3.0, label="Mean wealth")
     ax.set_xlim(x_edges[0], x_edges[-1])
-    ax.set_xlabel(LABELS["steps"])
-    ax.set_ylabel(spec["label4"].format(w=window))
-    ax.set_title("Stationary wealth distribution through training")
-    ax.legend(loc="upper left")
+    ax.set_xlabel(LABELS["steps"], fontsize=14)
+    ax.set_ylabel(spec["label4"].format(w=window), fontsize=14)
+    ax.set_title("Stationary wealth distribution through training", fontsize=16)
+    legend = ax.legend(loc="upper left", fontsize=14, markerfirst=False, frameon=True, facecolor="white", framealpha=0.7)
     ax.grid(False)
-    fig.colorbar(mesh, ax=ax, label="Density (logarithmic scale)")
+    ax.tick_params(labelsize=11)
+    cbar = fig.colorbar(mesh, ax=ax)
+    cbar.set_label("Density (logarithmic scale)", size=12)
+    cbar.ax.tick_params(labelsize=11)
     fig.tight_layout()
     fig.savefig(path, bbox_inches="tight")
     plt.close(fig)
