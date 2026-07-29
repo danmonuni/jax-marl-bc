@@ -96,17 +96,32 @@ diagnostics and KS figure set from that directory, no GPU needed.
 ```bash
 python runs/ks-fig34-rerun/plot_fig34.py                        # -> <run>/figures/
 python runs/ks-fig34-rerun/plot_fig34.py run=<pulled dir> out_dir=runs/final-paper-runs
+python runs/ks-fig34-rerun/plot_fig34.py mode=pooled            # one convention -> 3.png, 4.png
 ```
 
 With no arguments it finds the single run under `results/` and writes beside
 it, which is what the Colab notebook does (the figures then sync to Drive with
-the record). `out_dir=runs/final-paper-runs` writes the paper's `3.png` /
-`4.png`.
+the record). `out_dir=runs/final-paper-runs` writes the paper's copies.
 
-It time-averages the cross-sectional histograms over the last 50 steps of each
-evaluation — figure 6's `steady_state_capital` convention, so figure 3's Gini
-becomes comparable with the Ginis in the sweep's `results.csv` — draws figure
-4 on a real linear step axis, and fits one law of motion per aggregate state.
+Both figures draw a cross-section out of the last `WINDOW = 50` steps of each
+evaluation, and there are two defensible ways to do that. `mode=both` (the
+default) renders each figure twice, `<n>-time-averaged.png` and
+`<n>-pooled.png`; naming one convention writes the plain `<n>.png`.
+
+| | `timeavg` | `pooled` |
+|---|---|---|
+| a sample is | one agent's mean over the window | one agent-step |
+| samples per histogram | 200 | 10 000 |
+| keeps within-agent time variation | no | yes |
+| equals | figure 6's `steady_state_capital`, windowed | averaging the window's per-step histograms; what `ref/*.png` did over the stationary half |
+| looks like | spiky; figure 4 blocky | smooth; figure 4 continuous |
+
+On this run they agree on the economics — trained capital Gini 0.215
+(`timeavg`) vs 0.221 (`pooled`), same mean 13.12 — so the choice is
+presentational.
+
+Figure 4 is drawn on a real linear step axis, and figure 3 fits one law of
+motion per aggregate state.
 
 Sanity check against the sweep's own row for this cell (`sigma=0.0, seed=8`):
 `capital_gini = 0.212`, `K_mean = 13.298`. Training should reproduce it — same

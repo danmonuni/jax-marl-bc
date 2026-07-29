@@ -44,12 +44,34 @@ from jmbc.plots.style import apply_style                            # noqa: E402
 #: periods counted back from the end of each evaluation rollout.
 WINDOW = 50
 
-#: Histogram resolution. The pooled histograms of ref/*.png had ~10^5 samples
-#: and could afford 40-60 bins; a time-averaged column has n_agents (=200)
-#: samples, so both are binned coarser -- fig. 4 especially, where 60 bins put
-#: ~3 agents in a bin and the heatmap turned to speckle.
-N_BINS_FIG3 = 30
-N_BINS_FIG4 = 24
+#: The two ways to turn a WINDOW-step slice into a cross-section, rendered
+#: side by side so the choice can be made by looking:
+#:
+#:   timeavg  average first, then bin. One sample per agent (n=200): its mean
+#:            over the window. Each agent's own within-window variation is
+#:            averaged out, so this is the cross-section of a settled economy
+#:            -- figure 6's `steady_state_capital` convention. Few samples, so
+#:            coarse bins and a blocky figure 4.
+#:   pooled   bin first, then average. Every agent-step in the window is a
+#:            sample (n = 200 x 50 = 10,000), which is identical to averaging
+#:            the window's per-step histograms. Keeps the within-agent time
+#:            variation, so the distribution comes out wider and much smoother
+#:            -- this is what ref/3.png and ref/4.png did (over the whole
+#:            stationary half rather than a window).
+MODES = {
+    "timeavg": {
+        "slug":   "time-averaged",
+        "bins3":  30, "bins4": 24,
+        "label3": "Capital $k^i$ (mean of last {w} steps)",
+        "label4": "Wealth (cash-on-hand, mean of last {w} steps)",
+    },
+    "pooled": {
+        "slug":   "pooled",
+        "bins3":  40, "bins4": 60,
+        "label3": "Capital $k^i$ (all agent-steps, last {w})",
+        "label4": "Wealth (cash-on-hand, all agent-steps, last {w})",
+    },
+}
 
 BURN_FRAC = 0.5      # for the panels that still pool the stationary half
 
@@ -106,18 +128,22 @@ def load_record(path: Path, window: int, panels: int = 4) -> dict:
             np.logspace(0, np.log10(S), panels)).astype(int).clip(1, S) - 1)
 
         done_win = z["done"][:, -window:]             # [S, w]
+        ks_win, w_win = z["ks"][:, -window:], z["wealths"][:, -window:]
         out = {
             "env_steps": env_steps, "sel": sel, "n_snapshots": S, "n_steps": T,
             "K": K, "agg_state": agg,
-            # per-agent time averages over the window, per snapshot: [S, n]
-            "k_bar": _window_mean(z["ks"][:, -window:], done_win),
-            "w_bar": _window_mean(z["wealths"][:, -window:], done_win),
+            # timeavg: per-agent mean over the window, per snapshot [S, n]
+            "k_timeavg": _window_mean(ks_win, done_win),
+            "w_timeavg": _window_mean(w_win, done_win),
+            # pooled: every agent-step in the window, per snapshot [S, w*n]
+            "k_pooled": _window_pool(ks_win, done_win),
+            "w_pooled": _window_pool(w_win, done_win),
         }
         # Untrained (first) and trained (last) snapshots, in full, for the
         # consumption-policy scatters.
         out["policy"] = {s: {c: z[c][s] for c in POLICY_CHANNELS}
                          for s in (0, S - 1)}
-    out["n_agents"] = out["k_bar"].shape[-1]
+    out["n_agents"] = out["k_timeavg"].shape[-1]
     return out
 
 
@@ -130,14 +156,34 @@ def _window_mean(a: np.ndarray, done: np.ndarray) -> np.ndarray:
                      for x, m in zip(a, keep)])
 
 
+def _window_pool(a: np.ndarray, done: np.ndarray) -> np.ndarray:
+    """Every agent-step of the window, auto-reset steps dropped. [S,w,n]->[S,m]
+
+    Ragged only if some snapshot loses more steps to auto-resets than another;
+    the evaluations are reset-free, so in practice every row has w*n samples.
+    """
+    keep = ~done.astype(bool)
+    if keep.all():
+        return a.reshape(a.shape[0], -1)
+    rows = [x[m].ravel() if m.any() else x.ravel() for x, m in zip(a, keep)]
+    n = min(len(r) for r in rows)
+    return np.stack([r[:n] for r in rows])
+
+
 def fmt_steps(s: float) -> str:
     return f"{s:.1e}".replace("e+0", "e").replace("e+", "e")
 
 
 # ── figure 3 ──────────────────────────────────────────────────────────────────
-def plot_fig3(d: dict, window: int, path: Path) -> None:
-    """Law-of-motion scatters (4 training stages), time-averaged capital
-    histograms, consumption-policy scatters -- untrained vs trained."""
+def plot_fig3(d: dict, window: int, path: Path, mode: str = "timeavg") -> None:
+    """Law-of-motion scatters (4 training stages), cross-sectional capital
+    histograms, consumption-policy scatters -- untrained vs trained.
+
+    ``mode`` selects how the histograms turn the window into a cross-section;
+    see MODES.
+    """
+    spec = MODES[mode]
+    ks = d[f"k_{mode}"]
     import matplotlib.pyplot as plt
     import matplotlib.gridspec as gridspec
     import scipy.stats as sp_stats
@@ -169,17 +215,17 @@ def plot_fig3(d: dict, window: int, path: Path) -> None:
         ax.legend(fontsize=7)
         ax.tick_params(labelsize=7)
 
-    # B -- cross-sectional capital, time-averaged over the last `window` steps.
+    # B -- cross-sectional capital over the last `window` steps.
     gs_mid = gs_outer[1].subgridspec(2, 1, hspace=0.55)
     for ax, s, label in zip(
         [fig.add_subplot(gs_mid[0]), fig.add_subplot(gs_mid[1])],
         [0, d["n_snapshots"] - 1], ["Untrained", "Trained"],
     ):
-        k_bar = d["k_bar"][s]
-        ax.hist(k_bar, bins=N_BINS_FIG3, density=True, color="steelblue",
+        k = ks[s]
+        ax.hist(k, bins=spec["bins3"], density=True, color="steelblue",
                 alpha=0.75)
-        ax.set_title(f"{label}  (Gini={gini(k_bar):.3f})", fontsize=9)
-        ax.set_xlabel(f"Capital $k^i$ (mean of last {window} steps)", fontsize=8)
+        ax.set_title(f"{label}  (Gini={gini(k):.3f})", fontsize=9)
+        ax.set_xlabel(spec["label3"].format(w=window), fontsize=8)
         ax.set_ylabel("Density", fontsize=8)
         ax.tick_params(labelsize=7)
 
@@ -214,19 +260,20 @@ def plot_fig3(d: dict, window: int, path: Path) -> None:
 
 
 # ── figure 4 ──────────────────────────────────────────────────────────────────
-def plot_fig4(d: dict, window: int, path: Path) -> None:
-    """x = training env steps, y = wealth, colour = density of the per-agent
-    wealth averaged over the last `window` steps."""
+def plot_fig4(d: dict, window: int, path: Path, mode: str = "timeavg") -> None:
+    """x = training env steps, y = wealth, colour = the cross-sectional
+    density over the last `window` steps (``mode``: see MODES)."""
     import matplotlib.pyplot as plt
     from matplotlib import colors as mcolors
     apply_style()
 
-    ws = d["w_bar"]                                   # [S, n]
+    spec = MODES[mode]
+    ws = d[f"w_{mode}"]                               # [S, samples]
     steps = d["env_steps"]
     lo, hi = np.percentile(ws, 0.5), np.percentile(ws, 99.5)
     if hi <= lo:
         hi = lo + 1e-6
-    bins = np.linspace(lo, hi, N_BINS_FIG4 + 1)
+    bins = np.linspace(lo, hi, spec["bins4"] + 1)
     dens = np.stack([np.histogram(w, bins=bins, density=True)[0] for w in ws],
                     axis=1)                            # [n_bins, S]
 
@@ -246,7 +293,7 @@ def plot_fig4(d: dict, window: int, path: Path) -> None:
             lw=1.2, label="mean wealth")
     ax.set_xlim(x_edges[0], x_edges[-1])
     ax.set_xlabel("Training env steps")
-    ax.set_ylabel(f"Wealth (cash-on-hand, mean of last {window} steps)")
+    ax.set_ylabel(spec["label4"].format(w=window))
     ax.set_title("Stationary wealth distribution through training")
     ax.legend(loc="upper left")
     ax.grid(False)
@@ -269,18 +316,29 @@ def main(argv=None) -> None:
         out_dir = (REPO_ROOT / out_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    d = load_record(run / "rollouts.npz", window)
-    plot_fig3(d, window, out_dir / "3.png")
-    plot_fig4(d, window, out_dir / "4.png")
+    # Default: render both conventions side by side, named for what they are.
+    # Pick one (mode=timeavg | pooled) and the files become the paper's plain
+    # 3.png / 4.png.
+    mode = opt.get("mode", "both")
+    if mode not in (*MODES, "both"):
+        raise SystemExit(f"mode must be one of {', '.join(MODES)} or both")
+    modes = list(MODES) if mode == "both" else [mode]
 
-    k_bar = d["k_bar"][-1]
-    print(f"figures -> {out_dir}/3.png, {out_dir}/4.png\n"
-          f"  source   {run}  ({d['n_snapshots']} updates x {d['n_steps']} "
+    d = load_record(run / "rollouts.npz", window)
+    print(f"source   {run}  ({d['n_snapshots']} snapshots x {d['n_steps']} "
           f"steps x {d['n_agents']} agents)\n"
-          f"  window   last {window} steps, per-agent time average\n"
-          f"  fig 3    stages at env steps "
-          f"{', '.join(fmt_steps(d['env_steps'][s]) for s in d['sel'])}\n"
-          f"  trained  capital Gini={gini(k_bar):.3f}  K_mean={k_bar.mean():.3f}")
+          f"window   last {window} steps\n"
+          f"fig 3    stages at env steps "
+          f"{', '.join(fmt_steps(d['env_steps'][s]) for s in d['sel'])}")
+    for m in modes:
+        suffix = f"-{MODES[m]['slug']}" if mode == "both" else ""
+        p3, p4 = out_dir / f"3{suffix}.png", out_dir / f"4{suffix}.png"
+        plot_fig3(d, window, p3, m)
+        plot_fig4(d, window, p4, m)
+        k = d[f"k_{m}"][-1]
+        print(f"{m:<8} -> {p3.name}, {p4.name}  "
+              f"({k.size} samples/histogram; trained capital "
+              f"Gini={gini(k):.3f}, mean={k.mean():.3f})")
 
 
 if __name__ == "__main__":
