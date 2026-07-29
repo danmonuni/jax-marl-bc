@@ -50,6 +50,27 @@ RC = {
     "legend.fontsize": 10, "legend.frameon": False, "lines.linewidth": 1.6,
 }
 
+#: Figure 3 carries TWO unrelated binary encodings -- the aggregate state of
+#: the economy (left block) and an agent's employment status (right block) --
+#: so they get separate hue pairs rather than one pair reused, which would
+#: imply the good state and the employed are the same thing.
+#:
+#: Hues are slots 1, 2, 7 and 3 of the reference categorical palette. As a
+#: four-colour set they clear the all-pairs gates (worst CVD ΔE 9.2 deutan,
+#: worst normal-vision ΔE 16.3) -- checked with the data-viz validator rather
+#: than by eye. Aqua sits at 2.74:1 on white, under the 3:1 contrast target,
+#: so its panel keeps the relief the rule asks for: a labelled legend, and in
+#: the left block line style (solid/dashed) repeats the state encoding.
+COLORS = {
+    "good":       "#eb6834",   # orange -- good aggregate state
+    "bad":        "#2a78d6",   # blue   -- bad aggregate state
+    "employed":   "#4a3aa7",   # violet -- employed
+    "unemployed": "#1baf7a",   # aqua   -- unemployed
+    # The capital histogram is a lone series carrying no identity, so it stays
+    # neutral: colouring it would claim membership in one of the pairs above.
+    "hist":       "#7f8894",
+}
+
 #: Wording for the recurring symbols, in the standards' "Description,
 #: $symbol$" form (§6). Spelled out once here so the two figures cannot
 #: drift apart, or from the paper.
@@ -233,8 +254,8 @@ def plot_fig3(d: dict, window: int, path: Path, mode: str = "timeavg") -> None:
         K = stationary_slice(d["K"][s], BURN_FRAC)
         agg = stationary_slice(d["agg_state"][s], BURN_FRAC)
         Kt, Kt1, agt = K[:-1], K[1:], agg[:-1]
-        for state, colour, ls, lab in ((1, "tab:orange", "-", "Good"),
-                                       (0, "tab:blue", "--", "Bad")):
+        for state, colour, ls, lab in ((1, COLORS["good"], "-", "Good"),
+                                       (0, COLORS["bad"], "--", "Bad")):
             m = agt == state
             ax.scatter(Kt[m], Kt1[m], s=4, alpha=0.4, color=colour,
                        label=f"{lab} state")
@@ -258,8 +279,8 @@ def plot_fig3(d: dict, window: int, path: Path, mode: str = "timeavg") -> None:
         [0, d["n_snapshots"] - 1], ["Untrained", "Trained"],
     ):
         k = ks[s]
-        ax.hist(k, bins=spec["bins3"], density=True, color="steelblue",
-                alpha=0.75)
+        ax.hist(k, bins=spec["bins3"], density=True, color=COLORS["hist"],
+                alpha=0.9, edgecolor="white", linewidth=0.6)
         ax.set_title(f"{label} policy (Gini = {gini(k):.3f})")
         ax.set_xlabel(spec["label3"].format(w=window))
         ax.set_ylabel(LABELS["density"])
@@ -280,10 +301,10 @@ def plot_fig3(d: dict, window: int, path: Path, mode: str = "timeavg") -> None:
         emp = stationary_slice(rec["emp_states"][:-1], BURN_FRAC)
         keep = ~stationary_slice(rec["done"][1:], BURN_FRAC).astype(bool)
         W, CF, emp = W[keep].ravel(), CF[keep].ravel(), emp[keep].ravel()
-        ax.scatter(W[emp == 1], CF[emp == 1], s=1, alpha=0.3,
-                   color="tab:orange", label="Employed")
-        ax.scatter(W[emp == 0], CF[emp == 0], s=1, alpha=0.3,
-                   color="tab:blue", label="Unemployed")
+        ax.scatter(W[emp == 1], CF[emp == 1], s=1, alpha=0.35,
+                   color=COLORS["employed"], label="Employed")
+        ax.scatter(W[emp == 0], CF[emp == 0], s=1, alpha=0.35,
+                   color=COLORS["unemployed"], label="Unemployed")
         ax.set_title(f"{label} policy")
         ax.set_xlabel(LABELS["a_i"])
         ax.set_ylabel(LABELS["c_i"])
