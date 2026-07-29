@@ -1,0 +1,73 @@
+# RunConfig defaults for rerun_fig34.py. CLI dotlist overrides win over this
+# file (e.g. `python rerun_fig34.py device=cpu n_snapshots=4`), or point at a
+# different file entirely via `config=<path>`.
+
+base_exp: ks_n200   # supplies only what `protocol` below does not pin
+                    # (obs_vars, net.hidden_dims, log.*, ...)
+
+# ── The single run, spelled out ──────────────────────────────────────────────
+# These are the resolved values of the v3 lognormal-kappa sweep
+# (runs/ks-wealth-lognormal-random-3/), the run behind figure 6. This
+# experiment is one of its cells, retrained so that the whole TRAINING
+# trajectory is recorded and not just the trained policy's rollout.
+#
+# Applied as explicit overrides rather than inherited, and re-checked by
+# verify_protocol() before training -- so a future edit to configs/exp/ks*.yaml
+# cannot quietly change what this runs.
+protocol:
+  env:
+    n_agents:        200
+    alpha:           0.36
+    beta:            0.95
+    delta:           0.025
+    max_steps:       200      # training episode length
+  train:
+    num_envs:        12       # batch/update = 12 x 200 x 200 = 480,000
+    rollout_len:     200
+    total_timesteps: 128000   # sequential steps = 640 updates x 200
+    update_epochs:   4
+    num_minibatches: 64
+    lr:              3.0e-4
+    gamma:           0.95
+    gae_lambda:      0.95
+    clip_eps:        0.2
+    vf_coef:         0.5
+    ent_coef:        0.0
+    anneal_lr:       true
+    max_grad_norm:   0.5
+  net:
+    activation:      tanh
+
+# ── Which cell ───────────────────────────────────────────────────────────────
+# sigma is the sweep's kappa log-dispersion, NOT env.sigma (the RBC TFP
+# innovation, inert in KS). sigma = 0 is the homogeneous baseline, kappa_i = 1
+# for every agent, with no seed dependence in the kappa draw itself.
+sigma: 0.0
+seed: 8
+
+# ── Starting capital (as the sweep ran it) ───────────────────────────────────
+# Per-agent draw, redrawn at every episode reset. Set k_init_dist: constant to
+# get ks_n200_top's old initialization (every agent at k = 1.0) instead.
+k_init_dist: uniform
+k_init_low: 10.0
+k_init_high: 70.0
+k_init_resample: per_episode
+
+# ── The record: why this experiment exists ───────────────────────────────────
+# The sweep kept one rollout per cell, the trained policy's. Figures 3 and 4
+# are about how the economy changes THROUGH training, so the policy is
+# evaluated at n_snapshots training updates, spaced LINEARLY (jmbc's own
+# diagnostics loop is log-spaced and cannot be told otherwise), and every step
+# of every one of those rollouts is kept.
+#
+# 30 x 200 x 200 agents is ~10 MB, so both numbers are cheap to raise.
+# Raising sim_steps thickens figure 3's law-of-motion panels -- they fit the
+# post-burn-in half of one evaluation, i.e. ~100 points at 200 steps -- at the
+# price of simulating past the 200-step episode the policy was trained on.
+n_snapshots: 30
+sim_steps: 200
+
+device: gpu
+out_dir: results
+save_policy: true   # keep params/network so the cell can be resimulated
+                    # without retraining

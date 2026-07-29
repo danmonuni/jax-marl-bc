@@ -46,7 +46,19 @@ paper.pdf
 
 results
 results/
-runs/
+
+# Run OUTPUT is ignored; an experiment's SOURCE is not. Without these
+# exceptions every new runs/<experiment>/ had to be `git add -f`-ed by hand,
+# and one forgotten add means the Colab notebook clones a repo with no script
+# in it. Only the top level of each experiment dir is exempt, so the data
+# underneath (results/, raw/, rollouts.npz, figures) stays out of the repo.
+runs/*
+!runs/*/
+runs/*/*
+!runs/*/README.md
+!runs/*/*.py
+!runs/*/*.yaml
+!runs/*/*.csv
 .archive/
 benchmarks/
 .sources/
