@@ -87,13 +87,15 @@ MODES = {
         "slug":   "time-averaged",
         "bins3":  30, "bins4": 24,
         "label3": LABELS["k_i"] + " (mean of the last {w} steps)",
-        "label4": LABELS["wealth"] + " (mean of the last {w} steps)",
+        # Figure 4's y label stays the bare quantity: the axis is tall and
+        # rotated, and how the window was reduced belongs in the caption.
+        "label4": LABELS["wealth"],
     },
     "pooled": {
         "slug":   "pooled",
         "bins3":  40, "bins4": 60,
         "label3": LABELS["k_i"] + " (all agent-steps of the last {w})",
-        "label4": LABELS["wealth"] + " (all agent-steps of the last {w})",
+        "label4": LABELS["wealth"],
     },
 }
 
