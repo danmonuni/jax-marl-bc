@@ -55,23 +55,29 @@ RC = {
 #: so they get separate hue pairs rather than one pair reused, which would
 #: imply the good state and the employed are the same thing.
 #:
-#: Hues are slots 1, 2, 7 and 3 of the reference categorical palette. As a
-#: four-colour set they clear the all-pairs gates (worst CVD ΔE 9.2 deutan,
-#: worst normal-vision ΔE 16.3) -- checked with the data-viz validator rather
-#: than by eye. Aqua sits at 2.74:1 on white, under the 3:1 contrast target,
-#: so its panel keeps the relief the rule asks for: a labelled legend, and in
-#: the left block line style (solid/dashed) repeats the state encoding.
+#: The four steps were tuned against the data-viz validator rather than by
+#: eye, because the two warm hues (and the two blues) have to stay apart
+#: ACROSS blocks for the split to read: as a set they clear the all-pairs
+#: gates (worst CVD ΔE 15.5 protan, worst normal-vision ΔE 23.1). The obvious
+#: first choice -- palette red beside palette orange -- fails badly (ΔE 7.1
+#: normal), and a darker blue than this drops out of the lightness band.
+#: Orange and light blue sit under the 3:1 contrast target, so their panels
+#: keep the relief the rule asks for: a labelled legend, plus line style
+#: (solid/dashed) repeating the state encoding in the left block.
+#: Warm reads as the better state in both blocks (good, employed) and cool as
+#: the worse one; the blocks are then told apart by depth -- the aggregate
+#: state is the saturated red/dark blue pair, the individual one the lighter
+#: orange/light blue.
 COLORS = {
-    "good":       "#eb6834",   # orange -- good aggregate state
-    "bad":        "#2a78d6",   # blue   -- bad aggregate state
-    "employed":   "#4a3aa7",   # violet -- employed
-    "unemployed": "#1baf7a",   # aqua   -- unemployed
-    # The capital histogram is a lone series, so its colour only has to avoid
-    # claiming membership in either pair above. A deep rose is the one hue
-    # that stays clear of all four as a fifth slot (all-pairs CVD ΔE 8.4,
-    # normal-vision 15.0); the palette's own magenta and yellow both collide
-    # with orange below the normal-vision floor.
-    "hist":       "#b8567f",
+    "good":       "#c92a3f",   # red        -- good aggregate state
+    "bad":        "#1d569c",   # dark blue  -- bad aggregate state
+    "employed":   "#f0912e",   # orange     -- employed
+    "unemployed": "#63a4e2",   # light blue -- unemployed
+    # The capital histogram is a lone series in its own panel, so its colour
+    # carries no identity to confuse -- it reuses the light blue. Stepped to
+    # #63a4e2 rather than a paler blue so it stays inside the lightness band
+    # and above the chroma floor (a lighter one reads as grey).
+    "hist":       "#63a4e2",
 }
 
 #: Wording for the recurring symbols, in the standards' "Description,
