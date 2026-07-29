@@ -60,11 +60,13 @@ k_init_resample: per_episode
 # diagnostics loop is log-spaced and cannot be told otherwise), and every step
 # of every one of those rollouts is kept.
 #
-# 30 x 200 x 200 agents is ~10 MB, so both numbers are cheap to raise.
+# 200 snapshots x 200 steps x 200 agents is ~70 MB and a couple of GPU-minutes
+# of evaluation. 200 is also every ~3rd update of the 640, so figure 4's x axis
+# is effectively continuous; drop it to 30 for a quick pass.
 # Raising sim_steps thickens figure 3's law-of-motion panels -- they fit the
 # post-burn-in half of one evaluation, i.e. ~100 points at 200 steps -- at the
 # price of simulating past the 200-step episode the policy was trained on.
-n_snapshots: 30
+n_snapshots: 200
 sim_steps: 200
 
 device: gpu

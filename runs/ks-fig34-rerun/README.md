@@ -45,7 +45,7 @@ reruns any other cell of the sweep, with the same dense recording.
 
 | | sweep cell | here |
 |---|---|---|
-| evaluations | 12, **log**-spaced | 30, **linearly** spaced |
+| evaluations | 12, **log**-spaced | 200, **linearly** spaced |
 | steps each | 200 | 200 |
 | agents kept | 200 | 200 |
 | what is saved | the trained policy's rollout | every snapshot's rollout, all steps |
@@ -60,11 +60,11 @@ episodes are 200 steps: the evaluator rebuilds the env with
 `max_steps = sim_steps + 1` (`report.py:55`). Training is untouched by any of
 this — snapshots are replayed after training ends.
 
-`30 x 200 x 200` is ~10 MB, so both numbers are cheap to raise. Raising
-`sim_steps` thickens figure 3's law-of-motion panels — they fit the
-post-burn-in half of one evaluation, ~100 points at 200 steps, against ~2500
-in the old `ref/3.png` — at the price of simulating past the 200-step episode
-the policy trained on.
+`200 x 200 x 200` is ~70 MB — 200 snapshots is every ~3rd update, so figure
+4's x axis is effectively continuous. Raising `sim_steps` thickens figure 3's
+law-of-motion panels — they fit the post-burn-in half of one evaluation, ~100
+points at 200 steps, against ~2500 in the old `ref/3.png` — at the price of
+simulating past the 200-step episode the policy trained on.
 
 ## Running it
 
@@ -93,13 +93,20 @@ diagnostics and KS figure set from that directory, no GPU needed.
 
 ## Plotting figures 3 and 4
 
-The paper figures are drawn outside this directory, by
-`runs/final-paper-runs/.rerun-final-fig34-sim/plot_fig34.py`: copy the run
-directory into that folder's `data/` and run it. It writes
-`runs/final-paper-runs/{3,4}.png` and time-averages the cross-sectional
-histograms over the last 50 steps of each evaluation — figure 6's
-`steady_state_capital` convention, so figure 3's Gini becomes comparable with
-the Ginis in `results.csv`.
+```bash
+python runs/ks-fig34-rerun/plot_fig34.py                        # -> <run>/figures/
+python runs/ks-fig34-rerun/plot_fig34.py run=<pulled dir> out_dir=runs/final-paper-runs
+```
+
+With no arguments it finds the single run under `results/` and writes beside
+it, which is what the Colab notebook does (the figures then sync to Drive with
+the record). `out_dir=runs/final-paper-runs` writes the paper's `3.png` /
+`4.png`.
+
+It time-averages the cross-sectional histograms over the last 50 steps of each
+evaluation — figure 6's `steady_state_capital` convention, so figure 3's Gini
+becomes comparable with the Ginis in the sweep's `results.csv` — draws figure
+4 on a real linear step axis, and fits one law of motion per aggregate state.
 
 Sanity check against the sweep's own row for this cell (`sigma=0.0, seed=8`):
 `capital_gini = 0.212`, `K_mean = 13.298`. Training should reproduce it — same
