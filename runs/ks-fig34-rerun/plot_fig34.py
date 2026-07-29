@@ -38,7 +38,31 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))          # jmbc isn't pip-installed here
 
 from jmbc.diagnostics.distributional import gini, stationary_slice  # noqa: E402
-from jmbc.plots.style import apply_style                            # noqa: E402
+
+#: House style, verbatim from
+#: runs/final-paper-runs/.plotting/PLOTTING-STANDARDS.md §8 -- jmbc's own
+#: style with savefig.dpi raised to 300 for print and legend text set at the
+#: axis-label size rather than matplotlib's smaller default.
+RC = {
+    "figure.dpi": 120, "savefig.dpi": 300, "font.size": 10,
+    "axes.titlesize": 11, "axes.labelsize": 10, "axes.grid": True,
+    "grid.color": "0.9", "grid.linewidth": 0.6, "axes.axisbelow": True,
+    "legend.fontsize": 10, "legend.frameon": False, "lines.linewidth": 1.6,
+}
+
+#: Wording for the recurring symbols, in the standards' "Description,
+#: $symbol$" form (§6). Spelled out once here so the two figures cannot
+#: drift apart, or from the paper.
+LABELS = {
+    "K_t":    "Aggregate capital, $K_t$",
+    "K_next": "Next-period aggregate capital, $K_{t+1}$",
+    "k_i":    "Capital, $k^i$",
+    "a_i":    "Wealth, $a^i$",
+    "c_i":    "Consumption fraction, $\\hat{c}^i$",
+    "steps":  "Training env steps (millions)",
+    "wealth": "Wealth, cash-on-hand",
+    "density": "Density",
+}
 
 #: The averaging window for every cross-sectional histogram, in simulated
 #: periods counted back from the end of each evaluation rollout.
@@ -62,14 +86,14 @@ MODES = {
     "timeavg": {
         "slug":   "time-averaged",
         "bins3":  30, "bins4": 24,
-        "label3": "Capital $k^i$ (mean of last {w} steps)",
-        "label4": "Wealth (cash-on-hand, mean of last {w} steps)",
+        "label3": LABELS["k_i"] + " (mean of the last {w} steps)",
+        "label4": LABELS["wealth"] + " (mean of the last {w} steps)",
     },
     "pooled": {
         "slug":   "pooled",
         "bins3":  40, "bins4": 60,
-        "label3": "Capital $k^i$ (all agent-steps, last {w})",
-        "label4": "Wealth (cash-on-hand, all agent-steps, last {w})",
+        "label3": LABELS["k_i"] + " (all agent-steps of the last {w})",
+        "label4": LABELS["wealth"] + " (all agent-steps of the last {w})",
     },
 }
 
@@ -174,6 +198,13 @@ def fmt_steps(s: float) -> str:
     return f"{s:.1e}".replace("e+0", "e").replace("e+", "e")
 
 
+def sci(s: float) -> str:
+    """2400.0 -> '$2.4 \\times 10^{3}$' -- scientific notation as typeset
+    mathematics, not matplotlib's '2e+03'."""
+    exp = int(np.floor(np.log10(s))) if s > 0 else 0
+    return f"${s / 10 ** exp:.1f} \\times 10^{{{exp}}}$"
+
+
 # ── figure 3 ──────────────────────────────────────────────────────────────────
 def plot_fig3(d: dict, window: int, path: Path, mode: str = "timeavg") -> None:
     """Law-of-motion scatters (4 training stages), cross-sectional capital
@@ -184,10 +215,11 @@ def plot_fig3(d: dict, window: int, path: Path, mode: str = "timeavg") -> None:
     """
     spec = MODES[mode]
     ks = d[f"k_{mode}"]
+    import matplotlib as mpl
     import matplotlib.pyplot as plt
     import matplotlib.gridspec as gridspec
     import scipy.stats as sp_stats
-    apply_style()
+    mpl.rcParams.update(RC)
 
     fig = plt.figure(figsize=(18, 7))
     gs_outer = gridspec.GridSpec(1, 3, figure=fig, wspace=0.38)
@@ -199,21 +231,23 @@ def plot_fig3(d: dict, window: int, path: Path, mode: str = "timeavg") -> None:
         K = stationary_slice(d["K"][s], BURN_FRAC)
         agg = stationary_slice(d["agg_state"][s], BURN_FRAC)
         Kt, Kt1, agt = K[:-1], K[1:], agg[:-1]
-        for state, colour, ls, lab in ((1, "tab:orange", "-", "good"),
-                                       (0, "tab:blue", "--", "bad")):
+        for state, colour, ls, lab in ((1, "tab:orange", "-", "Good"),
+                                       (0, "tab:blue", "--", "Bad")):
             m = agt == state
-            ax.scatter(Kt[m], Kt1[m], s=4, alpha=0.4, color=colour, label=lab)
+            ax.scatter(Kt[m], Kt1[m], s=4, alpha=0.4, color=colour,
+                       label=f"{lab} state")
             if m.sum() < 3:
                 continue
             slope, intercept, r, *_ = sp_stats.linregress(Kt[m], Kt1[m])
             x_r = np.linspace(Kt[m].min(), Kt[m].max(), 100)
             ax.plot(x_r, slope * x_r + intercept, color=colour, ls=ls, lw=1.2,
-                    label=f"{lab} $R^2 = {r ** 2:.3f}$")
-        ax.set_xlabel("$K_t$", fontsize=8)
-        ax.set_ylabel("$K_{t+1}$", fontsize=8)
-        ax.set_title(f"Step $\\approx {d['env_steps'][s]:.0e}$", fontsize=8)
+                    label=f"{lab} state fit, $R^2 = {r ** 2:.3f}$")
+        ax.set_xlabel(LABELS["K_t"], fontsize=8)
+        ax.set_ylabel(LABELS["K_next"], fontsize=8)
+        ax.set_title(f"After {sci(d['env_steps'][s])} training env steps",
+                     fontsize=9)
         ax.legend(fontsize=7)
-        ax.tick_params(labelsize=7)
+        ax.tick_params(labelsize=8)
 
     # B -- cross-sectional capital over the last `window` steps.
     gs_mid = gs_outer[1].subgridspec(2, 1, hspace=0.55)
@@ -224,10 +258,9 @@ def plot_fig3(d: dict, window: int, path: Path, mode: str = "timeavg") -> None:
         k = ks[s]
         ax.hist(k, bins=spec["bins3"], density=True, color="steelblue",
                 alpha=0.75)
-        ax.set_title(f"{label}  (Gini={gini(k):.3f})", fontsize=9)
-        ax.set_xlabel(spec["label3"].format(w=window), fontsize=8)
-        ax.set_ylabel("Density", fontsize=8)
-        ax.tick_params(labelsize=7)
+        ax.set_title(f"{label} policy (Gini = {gini(k):.3f})")
+        ax.set_xlabel(spec["label3"].format(w=window))
+        ax.set_ylabel(LABELS["density"])
 
     # C -- consumption policy, unchanged: every agent-step of the stationary
     # half, so the policy function itself is traced out rather than averaged.
@@ -246,16 +279,20 @@ def plot_fig3(d: dict, window: int, path: Path, mode: str = "timeavg") -> None:
         keep = ~stationary_slice(rec["done"][1:], BURN_FRAC).astype(bool)
         W, CF, emp = W[keep].ravel(), CF[keep].ravel(), emp[keep].ravel()
         ax.scatter(W[emp == 1], CF[emp == 1], s=1, alpha=0.3,
-                   color="tab:orange", label="employed")
+                   color="tab:orange", label="Employed")
         ax.scatter(W[emp == 0], CF[emp == 0], s=1, alpha=0.3,
-                   color="tab:blue", label="unemployed")
-        ax.set_title(label, fontsize=9)
-        ax.set_xlabel("Wealth $a^i$", fontsize=8)
-        ax.set_ylabel("Cons. frac. $\\hat{c}^i$", fontsize=8)
-        ax.legend(fontsize=7, markerscale=4)
-        ax.tick_params(labelsize=7)
+                   color="tab:blue", label="Unemployed")
+        ax.set_title(f"{label} policy")
+        ax.set_xlabel(LABELS["a_i"])
+        ax.set_ylabel(LABELS["c_i"])
+        ax.legend(markerscale=6)
 
-    fig.savefig(path, dpi=150, bbox_inches="tight")
+    # No fig.align_labels() here: the three blocks are separate subgridspecs,
+    # and align_labels groups by gridspec column, so it drags the middle and
+    # right y labels onto the left block's x position, overprinting them.
+    # Alignment inside each block is already exact (§7: one placement path
+    # per slot -- every label here goes through set_xlabel/set_ylabel).
+    fig.savefig(path, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -263,13 +300,16 @@ def plot_fig3(d: dict, window: int, path: Path, mode: str = "timeavg") -> None:
 def plot_fig4(d: dict, window: int, path: Path, mode: str = "timeavg") -> None:
     """x = training env steps, y = wealth, colour = the cross-sectional
     density over the last `window` steps (``mode``: see MODES)."""
+    import matplotlib as mpl
     import matplotlib.pyplot as plt
     from matplotlib import colors as mcolors
-    apply_style()
+    mpl.rcParams.update(RC)
 
     spec = MODES[mode]
     ws = d[f"w_{mode}"]                               # [S, samples]
-    steps = d["env_steps"]
+    # In millions, so the axis carries its own unit instead of matplotlib
+    # parking a bare "1e6" offset in the corner.
+    steps = d["env_steps"] / 1e6
     lo, hi = np.percentile(ws, 0.5), np.percentile(ws, 99.5)
     if hi <= lo:
         hi = lo + 1e-6
@@ -290,16 +330,16 @@ def plot_fig4(d: dict, window: int, path: Path, mode: str = "timeavg") -> None:
                          norm=mcolors.LogNorm(vmin=floor,
                                               vmax=dens.max() + 1e-12))
     ax.plot(steps, ws.mean(axis=1), color="cyan", marker="o", markersize=3.5,
-            lw=1.2, label="mean wealth")
+            lw=1.2, label="Mean wealth")
     ax.set_xlim(x_edges[0], x_edges[-1])
-    ax.set_xlabel("Training env steps")
+    ax.set_xlabel(LABELS["steps"])
     ax.set_ylabel(spec["label4"].format(w=window))
     ax.set_title("Stationary wealth distribution through training")
     ax.legend(loc="upper left")
     ax.grid(False)
-    fig.colorbar(mesh, ax=ax, label="density (log scale)")
+    fig.colorbar(mesh, ax=ax, label="Density (logarithmic scale)")
     fig.tight_layout()
-    fig.savefig(path, dpi=150, bbox_inches="tight")
+    fig.savefig(path, bbox_inches="tight")
     plt.close(fig)
 
 
