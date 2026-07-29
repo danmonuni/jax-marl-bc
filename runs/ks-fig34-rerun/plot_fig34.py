@@ -44,11 +44,12 @@ from jmbc.plots.style import apply_style                            # noqa: E402
 #: periods counted back from the end of each evaluation rollout.
 WINDOW = 50
 
-#: Histogram resolution. The pooled histograms of ref/3.png had ~10^5 samples
-#: and could afford 40 bins; a time-averaged one has n_agents (=200) samples,
-#: so it is binned coarser to stay readable.
+#: Histogram resolution. The pooled histograms of ref/*.png had ~10^5 samples
+#: and could afford 40-60 bins; a time-averaged column has n_agents (=200)
+#: samples, so both are binned coarser -- fig. 4 especially, where 60 bins put
+#: ~3 agents in a bin and the heatmap turned to speckle.
 N_BINS_FIG3 = 30
-N_BINS_FIG4 = 60
+N_BINS_FIG4 = 24
 
 BURN_FRAC = 0.5      # for the panels that still pool the stationary half
 
@@ -96,10 +97,13 @@ def load_record(path: Path, window: int, panels: int = 4) -> dict:
         if T < window:
             raise SystemExit(f"eval rollouts are {T} steps, shorter than the "
                              f"{window}-step averaging window")
-        # Figure 3's four stages: log-spaced over training, as in ref/3.png
-        # (its 12 snapshots were themselves log-spaced, sampled evenly).
+        # Figure 3's four stages: log-spaced over training, as in ref/3.png,
+        # and starting at snapshot 0. The record is linearly spaced, so a
+        # plain log pick would start at the second snapshot and every panel
+        # would show an already-converged law of motion -- the untrained end
+        # of the comparison is the whole point of the panel.
         sel = np.unique(np.round(
-            np.logspace(0, np.log10(S - 1), panels)).astype(int).clip(0, S - 1))
+            np.logspace(0, np.log10(S), panels)).astype(int).clip(1, S) - 1)
 
         done_win = z["done"][:, -window:]             # [S, w]
         out = {
