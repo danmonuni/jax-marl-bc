@@ -21,6 +21,17 @@ OURS = "jaxmarl-bc"
 # (benchmark_time), AOT phase split (run_and_time), total wall time.
 TIME_COLS = ("run_only_s", "run_time_s", "wall_time_s")
 
+# Reader-facing names for the parallelism axes; the DataFrame columns keep the
+# raw config leaf names. Sentence case, per the paper's plotting standards.
+AXIS_LABELS = {
+    "n_agents": "Number of agents, $n$",
+    "num_envs": "Number of environments, $E$",
+}
+
+
+def axis_label(col: str) -> str:
+    return AXIS_LABELS.get(col, col)
+
 
 def ensure_time_column(df):
     """Add a canonical ``time_s`` column (steady-state run seconds).
@@ -116,7 +127,7 @@ def plot_speedup(df, x: str, path: str, ours: str = OURS,
     ax.axhline(1.0, color="0.6", linestyle="--", linewidth=1)
     ax.set_xscale("log"); ax.set_yscale("log")
     ax.set_xlabel(x)
-    ax.set_ylabel("speedup (reference time / ours)")
+    ax.set_ylabel("Speedup (reference time / ours)")
     ax.set_title(title or "Speedup vs reference implementation")
     ax.legend()
     fig.tight_layout()
@@ -136,14 +147,17 @@ def _cell_fmt(v: float) -> str:
 
 def plot_phase_diagram(df, path, x: str = "n_agents", y: str = "num_envs",
                        value: str = "time_s", ours: str = OURS,
-                       cbar_label: str = "steady-state run time (s)",
-                       title: Optional[str] = None) -> bool:
+                       cbar_label: str = "Steady-state run time (s)",
+                       title: Optional[str] = None,
+                       dpi: Optional[int] = None) -> bool:
     """Phase diagram of ``value`` (run time, throughput, ...) over the (x, y)
     mesh.
 
     Cells are the mean over repeats; axes are categorical (one row/column per
     swept value, log-spaced grids stay readable). Sequential colormap, log
     color scale, every cell direct-labeled with its value.
+
+    ``dpi`` overrides the house 150 for print-resolution paper deliverables.
     """
     import matplotlib.pyplot as plt
     from matplotlib.colors import LogNorm
@@ -165,9 +179,9 @@ def plot_phase_diagram(df, path, x: str = "n_agents", y: str = "num_envs",
                   [f"{v:g}" for v in piv.columns])
     ax.set_yticks(np.arange(piv.shape[0]) + 0.5,
                   [f"{v:g}" for v in piv.index])
-    ax.set_xlabel(x)
-    ax.set_ylabel(y)
-    ax.set_title(title or f"Run time (s): {y} vs {x}")
+    ax.set_xlabel(axis_label(x))
+    ax.set_ylabel(axis_label(y))
+    ax.set_title(title or "Steady-state run time (s)")
     ax.grid(False)
 
     log_mid = (np.log(Z.min()) + np.log(Z.max())) / 2
@@ -181,7 +195,7 @@ def plot_phase_diagram(df, path, x: str = "n_agents", y: str = "num_envs",
                     fontsize=7, color="white" if dark_cell else "black")
     fig.colorbar(mesh, ax=ax, label=cbar_label)
     fig.tight_layout()
-    fig.savefig(path)
+    fig.savefig(path, **({"dpi": dpi} if dpi else {}))
     plt.close(fig)
     return True
 
@@ -210,9 +224,10 @@ def plot_tradeoff(df, product: int, path, x: str = "n_agents",
     ax.set_xscale("log"); ax.set_yscale("log")
     ax.set_xticks(agg[x], [f"{a:g}×{e:g}" for a, e in zip(agg[x], agg[y])])
     ax.minorticks_off()
-    ax.set_xlabel(f"{x} × {y}  (constant product = {product:g})")
-    ax.set_ylabel("steady-state run time (s)")
-    ax.set_title(title or f"Agents/envs tradeoff at {x}·{y} = {product:g}")
+    ax.set_xlabel(f"Agents $n$ × environments $E$  "
+                  f"(constant batch width $W = {product:g}$)")
+    ax.set_ylabel("Steady-state run time (s)")
+    ax.set_title(title or f"Agents/environments split at $n·E = {product:g}$")
     fig.tight_layout()
     fig.savefig(path)
     plt.close(fig)
@@ -236,14 +251,14 @@ def make_benchmark_figures(df, axes, out_dir: str, group_col: str = "method") ->
         if "throughput_steps_per_s" in df.columns:
             p = str(out / f"throughput_vs_{col}.png")
             plot_metric_vs(df, col, "throughput_steps_per_s", p, group_col,
-                           ylabel="env steps / s", title=f"Throughput vs {col}")
+                           ylabel="Env steps / s", title=f"Throughput vs {col}")
             paths.append(p)
         time_col = next((c for c in ("time_s",) + TIME_COLS if c in df.columns),
                         None)
         if time_col:
             p = str(out / f"walltime_vs_{col}.png")
             plot_metric_vs(df, col, time_col, p, group_col,
-                           ylabel="seconds", title=f"Wall time vs {col}")
+                           ylabel="Seconds", title=f"Wall time vs {col}")
             paths.append(p)
     return paths
 
@@ -280,7 +295,7 @@ def make_sweep_figures(df, axes, out_dir: str, figures: List[str],
             for col in axis_cols:
                 p = str(out / f"walltime_vs_{col}.png")
                 plot_metric_vs(df, col, "time_s", p, group_col,
-                               ylabel="steady-state run time (s)",
+                               ylabel="Steady-state run time (s)",
                                title=f"Run time vs {col}")
                 paths.append(p)
         elif kind == "throughput":
@@ -289,7 +304,7 @@ def make_sweep_figures(df, axes, out_dir: str, figures: List[str],
             for col in axis_cols:
                 p = str(out / f"throughput_vs_{col}.png")
                 plot_metric_vs(df, col, "throughput_steps_per_s", p, group_col,
-                               ylabel="transitions / s",
+                               ylabel="Transitions / s",
                                title=f"Throughput vs {col}")
                 paths.append(p)
         elif kind == "speedup":
@@ -316,8 +331,8 @@ def make_sweep_figures(df, axes, out_dir: str, figures: List[str],
                 p = str(out / "phase_throughput.png")
                 if plot_phase_diagram(
                         d2, p, value="transitions_per_s",
-                        cbar_label="transitions / s",
-                        title="Throughput (transitions/s): num_envs vs n_agents"):
+                        cbar_label="Agent-transitions / s",
+                        title="Total throughput (agent-transitions/s)"):
                     paths.append(p)
         elif kind == "tradeoff":
             if not tradeoff_product:
