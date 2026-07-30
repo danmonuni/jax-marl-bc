@@ -113,10 +113,10 @@ save_cell_runs: false       # true -> full per-cell run dir + figures
 figures: [auto]             # which graphs to render from the timing table:
                             # auto | walltime | throughput | speedup | phase | tradeoff
 tradeoff_product: null      # slice for "tradeoff": n_agents * num_envs == product
-reference_csv: null         # baseline timings (method, n_agents, time_hours|time_s)
-                            # overlaid on time figures & used by "speedup";
-                            # configs/reference/marlbc_ks_fig8_cpu.csv holds the
-                            # original paper's digitized single-CPU KS times
+reference_csv: null         # your own CSV of baseline timings, overlaid on the
+                            # time figures & used as the numerator of "speedup".
+                            # Columns: method, n_agents, time_hours | time_s
+                            # (path relative to the repo root; none shipped)
 ```
 
 ## Repository map
@@ -131,6 +131,7 @@ configs/                 WHAT to run
   exp/ks_local.yaml        derived preset: `extends: ks`, 5-minute CPU budget
   sweep/<name>.yaml        your benchmark grids (none shipped; see Sweep above)
   reference/*.csv          external baseline timings for `reference_csv`
+                           (none shipped; supply your own)
 jmbc/                    HOW it runs
   run.py                   CLI: train one experiment      -> runs/<exp>/<id>/
   sweep.py                 CLI: benchmark grid            -> benchmarks/<name>/

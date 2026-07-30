@@ -69,6 +69,11 @@ notebooks/
 # Configs the dashboard generates at runtime (configs/exp/dash-*.yaml).
 configs/exp/dash-*.yaml
 
+# Baseline timings for a sweep's `reference_csv`: third-party numbers digitized
+# from a published figure, kept local. The mechanism is in the sweep schema;
+# the data is not ours to redistribute.
+configs/reference/
+
 .bal
 
 
