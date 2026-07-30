@@ -1,0 +1,1277 @@
+{
+  "snapshot_indices": [
+    0,
+    22,
+    44,
+    66,
+    88,
+    110,
+    132,
+    154,
+    176,
+    198,
+    220,
+    242,
+    264,
+    286,
+    308,
+    331,
+    353,
+    375,
+    397,
+    419,
+    441,
+    463,
+    485,
+    507,
+    529,
+    551,
+    573,
+    595,
+    617,
+    639
+  ],
+  "num_updates": 640,
+  "snapshots": [
+    {
+      "update_idx": 0,
+      "economic": {
+        "euler": {
+          "euler_mean_abs": 0.38745856285095215,
+          "euler_median_abs": 0.3640028238296509,
+          "euler_p99_abs": 1.4275524616241455,
+          "euler_log10_mean_abs": -0.41177472472190857,
+          "constrained_frac": 0.0
+        },
+        "resource": {
+          "resource_mean_abs": 8.583069188716763e-08,
+          "resource_mean_rel": 5.149635029511046e-08
+        },
+        "steady_state": {
+          "K_mean": 0.7387025952339172,
+          "K_std": 0.010332894511520863,
+          "C_mean": 0.9250652194023132,
+          "L_mean": 1.058163046836853
+        },
+        "ks_forecast": {
+          "ks_lom_r2": 0.9223510026931763,
+          "den_haan_max_pct": 1.8256492614746094,
+          "den_haan_mean_pct": 0.476012647151947
+        }
+      },
+      "distributional": {
+        "capital_gini": 0.03722811416342897,
+        "capital": {
+          "mean": 0.7387027144432068,
+          "std": 0.08017408847808838,
+          "median": 0.7700595259666443,
+          "p10": 0.657817006111145,
+          "p90": 0.77098548412323
+        },
+        "top_0.01_share": 0.010442542843520641,
+        "top_0.1_share": 0.10439345985651016,
+        "wealth_gini": 0.040922018497489665
+      }
+    },
+    {
+      "update_idx": 22,
+      "economic": {
+        "euler": {
+          "euler_mean_abs": 0.16539457440376282,
+          "euler_median_abs": 0.14238113164901733,
+          "euler_p99_abs": 0.7437639236450195,
+          "euler_log10_mean_abs": -0.781478762626648,
+          "constrained_frac": 0.0
+        },
+        "resource": {
+          "resource_mean_abs": 1.5258788721439487e-07,
+          "resource_mean_rel": 4.3613809452835994e-08
+        },
+        "steady_state": {
+          "K_mean": 2.1701245307922363,
+          "K_std": 0.059657491743564606,
+          "C_mean": 1.3365719318389893,
+          "L_mean": 1.058163046836853
+        },
+        "ks_forecast": {
+          "ks_lom_r2": 0.9893198609352112,
+          "den_haan_max_pct": 1.3928543329238892,
+          "den_haan_mean_pct": 0.43676048517227173
+        }
+      },
+      "distributional": {
+        "capital_gini": 0.1241781504247812,
+        "capital": {
+          "mean": 2.1701245307922363,
+          "std": 0.4901127517223358,
+          "median": 2.2781901359558105,
+          "p10": 1.4459718465805054,
+          "p90": 2.703263521194458
+        },
+        "top_0.01_share": 0.01319645345211029,
+        "top_0.1_share": 0.12742458283901215,
+        "wealth_gini": 0.09988545103827207
+      }
+    },
+    {
+      "update_idx": 44,
+      "economic": {
+        "euler": {
+          "euler_mean_abs": 0.04461456090211868,
+          "euler_median_abs": 0.03450435400009155,
+          "euler_p99_abs": 0.26665082573890686,
+          "euler_log10_mean_abs": -1.3505233526229858,
+          "constrained_frac": 0.0
+        },
+        "resource": {
+          "resource_mean_abs": 3.1471253691961465e-07,
+          "resource_mean_rel": 3.842290752231747e-08
+        },
+        "steady_state": {
+          "K_mean": 6.311410903930664,
+          "K_std": 0.1532438099384308,
+          "C_mean": 1.8837716579437256,
+          "L_mean": 1.058163046836853
+        },
+        "ks_forecast": {
+          "ks_lom_r2": 0.992313027381897,
+          "den_haan_max_pct": 0.9307866096496582,
+          "den_haan_mean_pct": 0.3421846330165863
+        }
+      },
+      "distributional": {
+        "capital_gini": 0.10822297724568886,
+        "capital": {
+          "mean": 6.311410903930664,
+          "std": 1.244258165359497,
+          "median": 6.5432891845703125,
+          "p10": 4.55225944519043,
+          "p90": 7.679386138916016
+        },
+        "top_0.01_share": 0.013262622989714146,
+        "top_0.1_share": 0.12564054131507874,
+        "wealth_gini": 0.09466825757013142
+      }
+    },
+    {
+      "update_idx": 66,
+      "economic": {
+        "euler": {
+          "euler_mean_abs": 0.02656823955476284,
+          "euler_median_abs": 0.019395291805267334,
+          "euler_p99_abs": 0.18308265507221222,
+          "euler_log10_mean_abs": -1.5756372213363647,
+          "constrained_frac": 0.0
+        },
+        "resource": {
+          "resource_mean_abs": 5.054473604104714e-07,
+          "resource_mean_rel": 5.057113838802252e-08
+        },
+        "steady_state": {
+          "K_mean": 7.951590061187744,
+          "K_std": 0.17375493049621582,
+          "C_mean": 2.018131732940674,
+          "L_mean": 1.058163046836853
+        },
+        "ks_forecast": {
+          "ks_lom_r2": 0.9916855692863464,
+          "den_haan_max_pct": 0.8311682343482971,
+          "den_haan_mean_pct": 0.323736310005188
+        }
+      },
+      "distributional": {
+        "capital_gini": 0.0861342495976718,
+        "capital": {
+          "mean": 7.951590538024902,
+          "std": 1.2928513288497925,
+          "median": 8.289054870605469,
+          "p10": 6.134937286376953,
+          "p90": 9.243242263793945
+        },
+        "top_0.01_share": 0.012204359285533428,
+        "top_0.1_share": 0.11821656674146652,
+        "wealth_gini": 0.077514081467565
+      }
+    },
+    {
+      "update_idx": 88,
+      "economic": {
+        "euler": {
+          "euler_mean_abs": 0.00936263706535101,
+          "euler_median_abs": 0.0011625289916992188,
+          "euler_p99_abs": 0.15244542062282562,
+          "euler_log10_mean_abs": -2.028601884841919,
+          "constrained_frac": 0.0
+        },
+        "resource": {
+          "resource_mean_abs": 8.010864007701457e-07,
+          "resource_mean_rel": 5.866806063181684e-08
+        },
+        "steady_state": {
+          "K_mean": 11.431188583374023,
+          "K_std": 0.2800077497959137,
+          "C_mean": 2.2388694286346436,
+          "L_mean": 1.058163046836853
+        },
+        "ks_forecast": {
+          "ks_lom_r2": 0.9954949617385864,
+          "den_haan_max_pct": 0.7264502644538879,
+          "den_haan_mean_pct": 0.26304367184638977
+        }
+      },
+      "distributional": {
+        "capital_gini": 0.11738023603464653,
+        "capital": {
+          "mean": 11.431191444396973,
+          "std": 2.373833656311035,
+          "median": 11.406309127807617,
+          "p10": 8.415014266967773,
+          "p90": 14.58616828918457
+        },
+        "top_0.01_share": 0.0148250637575984,
+        "top_0.1_share": 0.13528895378112793,
+        "wealth_gini": 0.1054146802590965
+      }
+    },
+    {
+      "update_idx": 110,
+      "economic": {
+        "euler": {
+          "euler_mean_abs": 0.010695844888687134,
+          "euler_median_abs": 0.0034008026123046875,
+          "euler_p99_abs": 0.14367038011550903,
+          "euler_log10_mean_abs": -1.9707849025726318,
+          "constrained_frac": 0.0
+        },
+        "resource": {
+          "resource_mean_abs": 7.438659395120339e-07,
+          "resource_mean_rel": 5.7130538522187635e-08
+        },
+        "steady_state": {
+          "K_mean": 10.817923545837402,
+          "K_std": 0.2064857929944992,
+          "C_mean": 2.209127426147461,
+          "L_mean": 1.058163046836853
+        },
+        "ks_forecast": {
+          "ks_lom_r2": 0.9919062256813049,
+          "den_haan_max_pct": 0.8723359107971191,
+          "den_haan_mean_pct": 0.26364004611968994
+        }
+      },
+      "distributional": {
+        "capital_gini": 0.15286023151272343,
+        "capital": {
+          "mean": 10.817923545837402,
+          "std": 3.1026546955108643,
+          "median": 10.279343605041504,
+          "p10": 7.553745269775391,
+          "p90": 15.69961929321289
+        },
+        "top_0.01_share": 0.01868523098528385,
+        "top_0.1_share": 0.1646011620759964,
+        "wealth_gini": 0.1361336590884732
+      }
+    },
+    {
+      "update_idx": 132,
+      "economic": {
+        "euler": {
+          "euler_mean_abs": 0.01067266147583723,
+          "euler_median_abs": 0.004108220338821411,
+          "euler_p99_abs": 0.1315840482711792,
+          "euler_log10_mean_abs": -1.9717272520065308,
+          "constrained_frac": 0.0
+        },
+        "resource": {
+          "resource_mean_abs": 6.484985419774603e-07,
+          "resource_mean_rel": 4.407988996035783e-08
+        },
+        "steady_state": {
+          "K_mean": 12.487370491027832,
+          "K_std": 0.2523418664932251,
+          "C_mean": 2.296705484390259,
+          "L_mean": 1.058163046836853
+        },
+        "ks_forecast": {
+          "ks_lom_r2": 0.9935433268547058,
+          "den_haan_max_pct": 0.7164011597633362,
+          "den_haan_mean_pct": 0.26519593596458435
+        }
+      },
+      "distributional": {
+        "capital_gini": 0.2125383007077013,
+        "capital": {
+          "mean": 12.487370491027832,
+          "std": 4.856868267059326,
+          "median": 10.572280883789062,
+          "p10": 7.676609516143799,
+          "p90": 20.680021286010742
+        },
+        "top_0.01_share": 0.018448326736688614,
+        "top_0.1_share": 0.17471203207969666,
+        "wealth_gini": 0.1897794494840721
+      }
+    },
+    {
+      "update_idx": 154,
+      "economic": {
+        "euler": {
+          "euler_mean_abs": 0.01652020774781704,
+          "euler_median_abs": 0.008020460605621338,
+          "euler_p99_abs": 0.19963186979293823,
+          "euler_log10_mean_abs": -1.7819844484329224,
+          "constrained_frac": 0.0
+        },
+        "resource": {
+          "resource_mean_abs": 6.19888282926695e-07,
+          "resource_mean_rel": 5.1546358292853256e-08
+        },
+        "steady_state": {
+          "K_mean": 9.868836402893066,
+          "K_std": 0.20425930619239807,
+          "C_mean": 2.154228925704956,
+          "L_mean": 1.058163046836853
+        },
+        "ks_forecast": {
+          "ks_lom_r2": 0.9926899671554565,
+          "den_haan_max_pct": 0.7546530961990356,
+          "den_haan_mean_pct": 0.27076786756515503
+        }
+      },
+      "distributional": {
+        "capital_gini": 0.2384186070725689,
+        "capital": {
+          "mean": 9.868836402893066,
+          "std": 4.481123924255371,
+          "median": 7.963682651519775,
+          "p10": 5.875732421875,
+          "p90": 17.86495018005371
+        },
+        "top_0.01_share": 0.020002614706754684,
+        "top_0.1_share": 0.19066224992275238,
+        "wealth_gini": 0.20961438182949088
+      }
+    },
+    {
+      "update_idx": 176,
+      "economic": {
+        "euler": {
+          "euler_mean_abs": 0.010724474675953388,
+          "euler_median_abs": 0.0017558932304382324,
+          "euler_p99_abs": 0.19599473476409912,
+          "euler_log10_mean_abs": -1.9696239233016968,
+          "constrained_frac": 0.0
+        },
+        "resource": {
+          "resource_mean_abs": 7.915496667010302e-07,
+          "resource_mean_rel": 5.6523063562963216e-08
+        },
+        "steady_state": {
+          "K_mean": 11.751644134521484,
+          "K_std": 0.24466198682785034,
+          "C_mean": 2.258847713470459,
+          "L_mean": 1.058163046836853
+        },
+        "ks_forecast": {
+          "ks_lom_r2": 0.9937037825584412,
+          "den_haan_max_pct": 0.7639418244361877,
+          "den_haan_mean_pct": 0.28208911418914795
+        }
+      },
+      "distributional": {
+        "capital_gini": 0.2713463508406013,
+        "capital": {
+          "mean": 11.7516450881958,
+          "std": 5.824121952056885,
+          "median": 8.36221694946289,
+          "p10": 6.042252540588379,
+          "p90": 20.38024139404297
+        },
+        "top_0.01_share": 0.018486136570572853,
+        "top_0.1_share": 0.1790296584367752,
+        "wealth_gini": 0.24094157789412995
+      }
+    },
+    {
+      "update_idx": 198,
+      "economic": {
+        "euler": {
+          "euler_mean_abs": 0.01793038100004196,
+          "euler_median_abs": 0.009791851043701172,
+          "euler_p99_abs": 0.21069028973579407,
+          "euler_log10_mean_abs": -1.7464104890823364,
+          "constrained_frac": 0.0
+        },
+        "resource": {
+          "resource_mean_abs": 8.48770127959142e-07,
+          "resource_mean_rel": 5.156945448447914e-08
+        },
+        "steady_state": {
+          "K_mean": 14.065865516662598,
+          "K_std": 0.2739971876144409,
+          "C_mean": 2.372127056121826,
+          "L_mean": 1.058163046836853
+        },
+        "ks_forecast": {
+          "ks_lom_r2": 0.9941619634628296,
+          "den_haan_max_pct": 0.6806506514549255,
+          "den_haan_mean_pct": 0.3001343607902527
+        }
+      },
+      "distributional": {
+        "capital_gini": 0.30337975395427064,
+        "capital": {
+          "mean": 14.06586742401123,
+          "std": 7.817514896392822,
+          "median": 7.884533882141113,
+          "p10": 5.96790075302124,
+          "p90": 24.042133331298828
+        },
+        "top_0.01_share": 0.01802302710711956,
+        "top_0.1_share": 0.17536474764347076,
+        "wealth_gini": 0.27240678114841277
+      }
+    },
+    {
+      "update_idx": 220,
+      "economic": {
+        "euler": {
+          "euler_mean_abs": 0.015005459077656269,
+          "euler_median_abs": 0.00664067268371582,
+          "euler_p99_abs": 0.19464002549648285,
+          "euler_log10_mean_abs": -1.8237507343292236,
+          "constrained_frac": 0.0
+        },
+        "resource": {
+          "resource_mean_abs": 8.678436529407918e-07,
+          "resource_mean_rel": 5.6510305768142644e-08
+        },
+        "steady_state": {
+          "K_mean": 13.038321495056152,
+          "K_std": 0.2857562303543091,
+          "C_mean": 2.324965715408325,
+          "L_mean": 1.058163046836853
+        },
+        "ks_forecast": {
+          "ks_lom_r2": 0.9950963854789734,
+          "den_haan_max_pct": 0.6426306366920471,
+          "den_haan_mean_pct": 0.2596343159675598
+        }
+      },
+      "distributional": {
+        "capital_gini": 0.2655147180812951,
+        "capital": {
+          "mean": 13.038322448730469,
+          "std": 6.189134120941162,
+          "median": 11.704750061035156,
+          "p10": 6.302481651306152,
+          "p90": 21.2457218170166
+        },
+        "top_0.01_share": 0.01781771332025528,
+        "top_0.1_share": 0.16929280757904053,
+        "wealth_gini": 0.23730560355601815
+      }
+    },
+    {
+      "update_idx": 242,
+      "economic": {
+        "euler": {
+          "euler_mean_abs": 0.011795361526310444,
+          "euler_median_abs": 0.0027332305908203125,
+          "euler_p99_abs": 0.18749849498271942,
+          "euler_log10_mean_abs": -1.9282886981964111,
+          "constrained_frac": 0.0
+        },
+        "resource": {
+          "resource_mean_abs": 8.678436529407918e-07,
+          "resource_mean_rel": 6.111578443324106e-08
+        },
+        "steady_state": {
+          "K_mean": 11.9673433303833,
+          "K_std": 0.27601203322410583,
+          "C_mean": 2.2701284885406494,
+          "L_mean": 1.058163046836853
+        },
+        "ks_forecast": {
+          "ks_lom_r2": 0.9951161742210388,
+          "den_haan_max_pct": 0.7422736287117004,
+          "den_haan_mean_pct": 0.3002423942089081
+        }
+      },
+      "distributional": {
+        "capital_gini": 0.23496245194031795,
+        "capital": {
+          "mean": 11.9673433303833,
+          "std": 4.973795413970947,
+          "median": 10.838827133178711,
+          "p10": 6.356302261352539,
+          "p90": 18.572629928588867
+        },
+        "top_0.01_share": 0.016716143116354942,
+        "top_0.1_share": 0.16052165627479553,
+        "wealth_gini": 0.20905527479347308
+      }
+    },
+    {
+      "update_idx": 264,
+      "economic": {
+        "euler": {
+          "euler_mean_abs": 0.013424460776150227,
+          "euler_median_abs": 0.00658831000328064,
+          "euler_p99_abs": 0.14644524455070496,
+          "euler_log10_mean_abs": -1.8721030950546265,
+          "constrained_frac": 0.0
+        },
+        "resource": {
+          "resource_mean_abs": 8.010864007701457e-07,
+          "resource_mean_rel": 5.205639652672289e-08
+        },
+        "steady_state": {
+          "K_mean": 13.092761039733887,
+          "K_std": 0.29403063654899597,
+          "C_mean": 2.3257203102111816,
+          "L_mean": 1.058163046836853
+        },
+        "ks_forecast": {
+          "ks_lom_r2": 0.9952036738395691,
+          "den_haan_max_pct": 0.7286113500595093,
+          "den_haan_mean_pct": 0.29836440086364746
+        }
+      },
+      "distributional": {
+        "capital_gini": 0.1929919724896476,
+        "capital": {
+          "mean": 13.092761993408203,
+          "std": 4.418035507202148,
+          "median": 13.611964225769043,
+          "p10": 7.468312740325928,
+          "p90": 18.609397888183594
+        },
+        "top_0.01_share": 0.01522295456379652,
+        "top_0.1_share": 0.14622260630130768,
+        "wealth_gini": 0.17293512729426297
+      }
+    },
+    {
+      "update_idx": 286,
+      "economic": {
+        "euler": {
+          "euler_mean_abs": 0.014041880145668983,
+          "euler_median_abs": 0.008013993501663208,
+          "euler_p99_abs": 0.1391001045703888,
+          "euler_log10_mean_abs": -1.8525747060775757,
+          "constrained_frac": 0.0
+        },
+        "resource": {
+          "resource_mean_abs": 7.534027304245683e-07,
+          "resource_mean_rel": 4.733070824158858e-08
+        },
+        "steady_state": {
+          "K_mean": 13.561589241027832,
+          "K_std": 0.28550848364830017,
+          "C_mean": 2.3483500480651855,
+          "L_mean": 1.058163046836853
+        },
+        "ks_forecast": {
+          "ks_lom_r2": 0.9946458339691162,
+          "den_haan_max_pct": 0.7236036658287048,
+          "den_haan_mean_pct": 0.2971898019313812
+        }
+      },
+      "distributional": {
+        "capital_gini": 0.19820618285149494,
+        "capital": {
+          "mean": 13.561589241027832,
+          "std": 4.695239067077637,
+          "median": 13.783169746398926,
+          "p10": 7.704075813293457,
+          "p90": 19.539562225341797
+        },
+        "top_0.01_share": 0.015763185918331146,
+        "top_0.1_share": 0.1489786058664322,
+        "wealth_gini": 0.1779539040580438
+      }
+    },
+    {
+      "update_idx": 308,
+      "economic": {
+        "euler": {
+          "euler_mean_abs": 0.012658161111176014,
+          "euler_median_abs": 0.00632813572883606,
+          "euler_p99_abs": 0.14028777182102203,
+          "euler_log10_mean_abs": -1.8976293802261353,
+          "constrained_frac": 0.0
+        },
+        "resource": {
+          "resource_mean_abs": 8.964538551481382e-07,
+          "resource_mean_rel": 5.839811834107422e-08
+        },
+        "steady_state": {
+          "K_mean": 13.045805931091309,
+          "K_std": 0.2764699459075928,
+          "C_mean": 2.323819637298584,
+          "L_mean": 1.058163046836853
+        },
+        "ks_forecast": {
+          "ks_lom_r2": 0.9945023059844971,
+          "den_haan_max_pct": 0.7212633490562439,
+          "den_haan_mean_pct": 0.29118984937667847
+        }
+      },
+      "distributional": {
+        "capital_gini": 0.19488427923275742,
+        "capital": {
+          "mean": 13.045805931091309,
+          "std": 4.43715238571167,
+          "median": 13.14004898071289,
+          "p10": 7.504993915557861,
+          "p90": 18.729965209960938
+        },
+        "top_0.01_share": 0.015677688643336296,
+        "top_0.1_share": 0.148371621966362,
+        "wealth_gini": 0.17458431468651447
+      }
+    },
+    {
+      "update_idx": 331,
+      "economic": {
+        "euler": {
+          "euler_mean_abs": 0.011126363649964333,
+          "euler_median_abs": 0.0033963024616241455,
+          "euler_p99_abs": 0.16674305498600006,
+          "euler_log10_mean_abs": -1.9536467790603638,
+          "constrained_frac": 0.0
+        },
+        "resource": {
+          "resource_mean_abs": 7.05719003235572e-07,
+          "resource_mean_rel": 4.880504533844032e-08
+        },
+        "steady_state": {
+          "K_mean": 12.198163986206055,
+          "K_std": 0.2686615586280823,
+          "C_mean": 2.282938003540039,
+          "L_mean": 1.058163046836853
+        },
+        "ks_forecast": {
+          "ks_lom_r2": 0.9945430159568787,
+          "den_haan_max_pct": 0.8029073476791382,
+          "den_haan_mean_pct": 0.30800560116767883
+        }
+      },
+      "distributional": {
+        "capital_gini": 0.23796189549643088,
+        "capital": {
+          "mean": 12.198163986206055,
+          "std": 5.114039421081543,
+          "median": 10.381543159484863,
+          "p10": 6.500588417053223,
+          "p90": 19.314268112182617
+        },
+        "top_0.01_share": 0.01840098202228546,
+        "top_0.1_share": 0.16765251755714417,
+        "wealth_gini": 0.21190745956424362
+      }
+    },
+    {
+      "update_idx": 353,
+      "economic": {
+        "euler": {
+          "euler_mean_abs": 0.010089234448969364,
+          "euler_median_abs": 0.0017004311084747314,
+          "euler_p99_abs": 0.17104455828666687,
+          "euler_log10_mean_abs": -1.996141791343689,
+          "constrained_frac": 0.0
+        },
+        "resource": {
+          "resource_mean_abs": 5.531310875994677e-07,
+          "resource_mean_rel": 3.950409777075947e-08
+        },
+        "steady_state": {
+          "K_mean": 11.735786437988281,
+          "K_std": 0.2559172511100769,
+          "C_mean": 2.2590131759643555,
+          "L_mean": 1.058163046836853
+        },
+        "ks_forecast": {
+          "ks_lom_r2": 0.9942015409469604,
+          "den_haan_max_pct": 0.8070247173309326,
+          "den_haan_mean_pct": 0.2951694428920746
+        }
+      },
+      "distributional": {
+        "capital_gini": 0.2396307883177906,
+        "capital": {
+          "mean": 11.735785484313965,
+          "std": 4.985663414001465,
+          "median": 9.735811233520508,
+          "p10": 6.38837194442749,
+          "p90": 19.1246395111084
+        },
+        "top_0.01_share": 0.019113384187221527,
+        "top_0.1_share": 0.17382283508777618,
+        "wealth_gini": 0.21276216295255979
+      }
+    },
+    {
+      "update_idx": 375,
+      "economic": {
+        "euler": {
+          "euler_mean_abs": 0.009330673143267632,
+          "euler_median_abs": 0.0011556446552276611,
+          "euler_p99_abs": 0.16490544378757477,
+          "euler_log10_mean_abs": -2.0300869941711426,
+          "constrained_frac": 0.0
+        },
+        "resource": {
+          "resource_mean_abs": 6.484985419774603e-07,
+          "resource_mean_rel": 4.68389949048742e-08
+        },
+        "steady_state": {
+          "K_mean": 11.578104019165039,
+          "K_std": 0.25105708837509155,
+          "C_mean": 2.250213384628296,
+          "L_mean": 1.058163046836853
+        },
+        "ks_forecast": {
+          "ks_lom_r2": 0.9939900040626526,
+          "den_haan_max_pct": 0.8189239501953125,
+          "den_haan_mean_pct": 0.3058764636516571
+        }
+      },
+      "distributional": {
+        "capital_gini": 0.22635996593793872,
+        "capital": {
+          "mean": 11.578104019165039,
+          "std": 4.618748664855957,
+          "median": 10.061159133911133,
+          "p10": 6.46051025390625,
+          "p90": 18.38608169555664
+        },
+        "top_0.01_share": 0.01807994395494461,
+        "top_0.1_share": 0.1674778163433075,
+        "wealth_gini": 0.20091140600484603
+      }
+    },
+    {
+      "update_idx": 397,
+      "economic": {
+        "euler": {
+          "euler_mean_abs": 0.010104428045451641,
+          "euler_median_abs": 0.002551257610321045,
+          "euler_p99_abs": 0.16134586930274963,
+          "euler_log10_mean_abs": -1.9954882860183716,
+          "constrained_frac": 0.0
+        },
+        "resource": {
+          "resource_mean_abs": 8.48770127959142e-07,
+          "resource_mean_rel": 5.946401060441531e-08
+        },
+        "steady_state": {
+          "K_mean": 11.99081039428711,
+          "K_std": 0.255006343126297,
+          "C_mean": 2.2723135948181152,
+          "L_mean": 1.058163046836853
+        },
+        "ks_forecast": {
+          "ks_lom_r2": 0.9939278364181519,
+          "den_haan_max_pct": 0.8123469948768616,
+          "den_haan_mean_pct": 0.3157232999801636
+        }
+      },
+      "distributional": {
+        "capital_gini": 0.22553293971126886,
+        "capital": {
+          "mean": 11.990811347961426,
+          "std": 4.762105941772461,
+          "median": 10.387798309326172,
+          "p10": 6.699087142944336,
+          "p90": 18.868383407592773
+        },
+        "top_0.01_share": 0.017759589478373528,
+        "top_0.1_share": 0.16525568068027496,
+        "wealth_gini": 0.20067292036514095
+      }
+    },
+    {
+      "update_idx": 419,
+      "economic": {
+        "euler": {
+          "euler_mean_abs": 0.012524859979748726,
+          "euler_median_abs": 0.005557894706726074,
+          "euler_p99_abs": 0.1602788269519806,
+          "euler_log10_mean_abs": -1.9022271633148193,
+          "constrained_frac": 0.0
+        },
+        "resource": {
+          "resource_mean_abs": 7.724761985627993e-07,
+          "resource_mean_rel": 5.11693691862547e-08
+        },
+        "steady_state": {
+          "K_mean": 12.806973457336426,
+          "K_std": 0.26993319392204285,
+          "C_mean": 2.313338279724121,
+          "L_mean": 1.058163046836853
+        },
+        "ks_forecast": {
+          "ks_lom_r2": 0.9943011403083801,
+          "den_haan_max_pct": 0.7180714011192322,
+          "den_haan_mean_pct": 0.31360432505607605
+        }
+      },
+      "distributional": {
+        "capital_gini": 0.22906565328794848,
+        "capital": {
+          "mean": 12.806973457336426,
+          "std": 5.162014007568359,
+          "median": 11.450263977050781,
+          "p10": 6.928999900817871,
+          "p90": 19.81812286376953
+        },
+        "top_0.01_share": 0.017076615244150162,
+        "top_0.1_share": 0.1609956920146942,
+        "wealth_gini": 0.2046767544131911
+      }
+    },
+    {
+      "update_idx": 441,
+      "economic": {
+        "euler": {
+          "euler_mean_abs": 0.012043562717735767,
+          "euler_median_abs": 0.00494837760925293,
+          "euler_p99_abs": 0.15820641815662384,
+          "euler_log10_mean_abs": -1.9192450046539307,
+          "constrained_frac": 0.0
+        },
+        "resource": {
+          "resource_mean_abs": 8.29696659820911e-07,
+          "resource_mean_rel": 5.567783745163979e-08
+        },
+        "steady_state": {
+          "K_mean": 12.613293647766113,
+          "K_std": 0.26687175035476685,
+          "C_mean": 2.3044533729553223,
+          "L_mean": 1.058163046836853
+        },
+        "ks_forecast": {
+          "ks_lom_r2": 0.9942571520805359,
+          "den_haan_max_pct": 0.7476826310157776,
+          "den_haan_mean_pct": 0.2943253219127655
+        }
+      },
+      "distributional": {
+        "capital_gini": 0.22634328551934613,
+        "capital": {
+          "mean": 12.61329460144043,
+          "std": 5.047335624694824,
+          "median": 10.49559211730957,
+          "p10": 7.069108963012695,
+          "p90": 19.728275299072266
+        },
+        "top_0.01_share": 0.017362307757139206,
+        "top_0.1_share": 0.16318534314632416,
+        "wealth_gini": 0.2020609554084456
+      }
+    },
+    {
+      "update_idx": 463,
+      "economic": {
+        "euler": {
+          "euler_mean_abs": 0.015395487658679485,
+          "euler_median_abs": 0.009261876344680786,
+          "euler_p99_abs": 0.14875459671020508,
+          "euler_log10_mean_abs": -1.8126065731048584,
+          "constrained_frac": 0.0
+        },
+        "resource": {
+          "resource_mean_abs": 8.201599257517955e-07,
+          "resource_mean_rel": 5.036314476569714e-08
+        },
+        "steady_state": {
+          "K_mean": 13.913860321044922,
+          "K_std": 0.28317517042160034,
+          "C_mean": 2.3660776615142822,
+          "L_mean": 1.058163046836853
+        },
+        "ks_forecast": {
+          "ks_lom_r2": 0.9944413304328918,
+          "den_haan_max_pct": 0.6807097792625427,
+          "den_haan_mean_pct": 0.2858285903930664
+        }
+      },
+      "distributional": {
+        "capital_gini": 0.2244649651846795,
+        "capital": {
+          "mean": 13.913861274719238,
+          "std": 5.516907691955566,
+          "median": 12.468299865722656,
+          "p10": 7.656965732574463,
+          "p90": 21.23419761657715
+        },
+        "top_0.01_share": 0.01686743274331093,
+        "top_0.1_share": 0.1586284190416336,
+        "wealth_gini": 0.2016543778895581
+      }
+    },
+    {
+      "update_idx": 485,
+      "economic": {
+        "euler": {
+          "euler_mean_abs": 0.014303178526461124,
+          "euler_median_abs": 0.008218199014663696,
+          "euler_p99_abs": 0.14267244935035706,
+          "euler_log10_mean_abs": -1.8445674180984497,
+          "constrained_frac": 0.0
+        },
+        "resource": {
+          "resource_mean_abs": 8.010864007701457e-07,
+          "resource_mean_rel": 5.012089943079445e-08
+        },
+        "steady_state": {
+          "K_mean": 13.622397422790527,
+          "K_std": 0.2653529942035675,
+          "C_mean": 2.3527989387512207,
+          "L_mean": 1.058163046836853
+        },
+        "ks_forecast": {
+          "ks_lom_r2": 0.9937812089920044,
+          "den_haan_max_pct": 0.7223731875419617,
+          "den_haan_mean_pct": 0.2891298532485962
+        }
+      },
+      "distributional": {
+        "capital_gini": 0.2040272428463581,
+        "capital": {
+          "mean": 13.622400283813477,
+          "std": 4.871809482574463,
+          "median": 12.46572494506836,
+          "p10": 7.955463886260986,
+          "p90": 20.230375289916992
+        },
+        "top_0.01_share": 0.016359014436602592,
+        "top_0.1_share": 0.1542278528213501,
+        "wealth_gini": 0.18318724091246819
+      }
+    },
+    {
+      "update_idx": 507,
+      "economic": {
+        "euler": {
+          "euler_mean_abs": 0.013466812670230865,
+          "euler_median_abs": 0.0072300732135772705,
+          "euler_p99_abs": 0.1409289836883545,
+          "euler_log10_mean_abs": -1.8707351684570312,
+          "constrained_frac": 0.0
+        },
+        "resource": {
+          "resource_mean_abs": 9.059905892172537e-07,
+          "resource_mean_rel": 5.7976969003448175e-08
+        },
+        "steady_state": {
+          "K_mean": 13.310030937194824,
+          "K_std": 0.2583077847957611,
+          "C_mean": 2.33855938911438,
+          "L_mean": 1.058163046836853
+        },
+        "ks_forecast": {
+          "ks_lom_r2": 0.9936072826385498,
+          "den_haan_max_pct": 0.7344467043876648,
+          "den_haan_mean_pct": 0.28702467679977417
+        }
+      },
+      "distributional": {
+        "capital_gini": 0.1921671105966536,
+        "capital": {
+          "mean": 13.310030937194824,
+          "std": 4.470330715179443,
+          "median": 12.394476890563965,
+          "p10": 8.026679039001465,
+          "p90": 19.433032989501953
+        },
+        "top_0.01_share": 0.01604575850069523,
+        "top_0.1_share": 0.15158095955848694,
+        "wealth_gini": 0.1723803449069372
+      }
+    },
+    {
+      "update_idx": 529,
+      "economic": {
+        "euler": {
+          "euler_mean_abs": 0.01442710217088461,
+          "euler_median_abs": 0.008395552635192871,
+          "euler_p99_abs": 0.14172104001045227,
+          "euler_log10_mean_abs": -1.8408209085464478,
+          "constrained_frac": 0.0
+        },
+        "resource": {
+          "resource_mean_abs": 6.771087441848067e-07,
+          "resource_mean_rel": 4.239064921307545e-08
+        },
+        "steady_state": {
+          "K_mean": 13.650501251220703,
+          "K_std": 0.2701297104358673,
+          "C_mean": 2.3544089794158936,
+          "L_mean": 1.058163046836853
+        },
+        "ks_forecast": {
+          "ks_lom_r2": 0.9939860105514526,
+          "den_haan_max_pct": 0.7345815896987915,
+          "den_haan_mean_pct": 0.2896924912929535
+        }
+      },
+      "distributional": {
+        "capital_gini": 0.2021022808594708,
+        "capital": {
+          "mean": 13.650503158569336,
+          "std": 4.828281402587891,
+          "median": 12.60400676727295,
+          "p10": 7.995464324951172,
+          "p90": 20.219655990600586
+        },
+        "top_0.01_share": 0.01643863134086132,
+        "top_0.1_share": 0.15419192612171173,
+        "wealth_gini": 0.1814959267976357
+      }
+    },
+    {
+      "update_idx": 551,
+      "economic": {
+        "euler": {
+          "euler_mean_abs": 0.014506111852824688,
+          "euler_median_abs": 0.008387237787246704,
+          "euler_p99_abs": 0.14274448156356812,
+          "euler_log10_mean_abs": -1.8384490013122559,
+          "constrained_frac": 0.0
+        },
+        "resource": {
+          "resource_mean_abs": 8.392333938900265e-07,
+          "resource_mean_rel": 5.2282640439216266e-08
+        },
+        "steady_state": {
+          "K_mean": 13.65941047668457,
+          "K_std": 0.2680622637271881,
+          "C_mean": 2.3550477027893066,
+          "L_mean": 1.058163046836853
+        },
+        "ks_forecast": {
+          "ks_lom_r2": 0.9939517974853516,
+          "den_haan_max_pct": 0.6996212005615234,
+          "den_haan_mean_pct": 0.27360039949417114
+        }
+      },
+      "distributional": {
+        "capital_gini": 0.20905086003654305,
+        "capital": {
+          "mean": 13.659412384033203,
+          "std": 5.011912822723389,
+          "median": 12.180564880371094,
+          "p10": 7.948952674865723,
+          "p90": 20.619848251342773
+        },
+        "top_0.01_share": 0.016879869624972343,
+        "top_0.1_share": 0.15761695802211761,
+        "wealth_gini": 0.18766183882010612
+      }
+    },
+    {
+      "update_idx": 573,
+      "economic": {
+        "euler": {
+          "euler_mean_abs": 0.013133877888321877,
+          "euler_median_abs": 0.006560981273651123,
+          "euler_p99_abs": 0.1486945003271103,
+          "euler_log10_mean_abs": -1.8816070556640625,
+          "constrained_frac": 0.0
+        },
+        "resource": {
+          "resource_mean_abs": 8.29696659820911e-07,
+          "resource_mean_rel": 5.388456258970109e-08
+        },
+        "steady_state": {
+          "K_mean": 13.07979965209961,
+          "K_std": 0.26066893339157104,
+          "C_mean": 2.3281309604644775,
+          "L_mean": 1.058163046836853
+        },
+        "ks_forecast": {
+          "ks_lom_r2": 0.9938072562217712,
+          "den_haan_max_pct": 0.7390425801277161,
+          "den_haan_mean_pct": 0.2734474241733551
+        }
+      },
+      "distributional": {
+        "capital_gini": 0.2201231195823341,
+        "capital": {
+          "mean": 13.079800605773926,
+          "std": 5.091429710388184,
+          "median": 11.06104850769043,
+          "p10": 7.532400608062744,
+          "p90": 20.436155319213867
+        },
+        "top_0.01_share": 0.017652297392487526,
+        "top_0.1_share": 0.16408127546310425,
+        "wealth_gini": 0.19700139873311384
+      }
+    },
+    {
+      "update_idx": 595,
+      "economic": {
+        "euler": {
+          "euler_mean_abs": 0.014164598658680916,
+          "euler_median_abs": 0.007560819387435913,
+          "euler_p99_abs": 0.15153810381889343,
+          "euler_log10_mean_abs": -1.848795771598816,
+          "constrained_frac": 0.0
+        },
+        "resource": {
+          "resource_mean_abs": 8.010864007701457e-07,
+          "resource_mean_rel": 5.0984681365662254e-08
+        },
+        "steady_state": {
+          "K_mean": 13.391134262084961,
+          "K_std": 0.27017319202423096,
+          "C_mean": 2.3426284790039062,
+          "L_mean": 1.058163046836853
+        },
+        "ks_forecast": {
+          "ks_lom_r2": 0.9941621422767639,
+          "den_haan_max_pct": 0.730998158454895,
+          "den_haan_mean_pct": 0.2789555490016937
+        }
+      },
+      "distributional": {
+        "capital_gini": 0.2231287002475757,
+        "capital": {
+          "mean": 13.391134262084961,
+          "std": 5.273458957672119,
+          "median": 11.399385452270508,
+          "p10": 7.595250606536865,
+          "p90": 20.90830421447754
+        },
+        "top_0.01_share": 0.017602816224098206,
+        "top_0.1_share": 0.16377025842666626,
+        "wealth_gini": 0.19995350463546724
+      }
+    },
+    {
+      "update_idx": 617,
+      "economic": {
+        "euler": {
+          "euler_mean_abs": 0.013199450448155403,
+          "euler_median_abs": 0.006346255540847778,
+          "euler_p99_abs": 0.15368501842021942,
+          "euler_log10_mean_abs": -1.8794441223144531,
+          "constrained_frac": 0.0
+        },
+        "resource": {
+          "resource_mean_abs": 7.24792471373803e-07,
+          "resource_mean_rel": 4.7259494095897026e-08
+        },
+        "steady_state": {
+          "K_mean": 13.039168357849121,
+          "K_std": 0.25942519307136536,
+          "C_mean": 2.326122283935547,
+          "L_mean": 1.058163046836853
+        },
+        "ks_forecast": {
+          "ks_lom_r2": 0.9938156604766846,
+          "den_haan_max_pct": 0.7328087687492371,
+          "den_haan_mean_pct": 0.2748200297355652
+        }
+      },
+      "distributional": {
+        "capital_gini": 0.22623027285208575,
+        "capital": {
+          "mean": 13.039167404174805,
+          "std": 5.223623275756836,
+          "median": 10.926593780517578,
+          "p10": 7.3989105224609375,
+          "p90": 20.6259708404541
+        },
+        "top_0.01_share": 0.01792127825319767,
+        "top_0.1_share": 0.16637925803661346,
+        "wealth_gini": 0.202377170006659
+      }
+    },
+    {
+      "update_idx": 639,
+      "economic": {
+        "euler": {
+          "euler_mean_abs": 0.013059963472187519,
+          "euler_median_abs": 0.0062888264656066895,
+          "euler_p99_abs": 0.15263131260871887,
+          "euler_log10_mean_abs": -1.8840579986572266,
+          "constrained_frac": 0.0
+        },
+        "resource": {
+          "resource_mean_abs": 7.724761985627993e-07,
+          "resource_mean_rel": 5.0360949188643644e-08
+        },
+        "steady_state": {
+          "K_mean": 13.029374122619629,
+          "K_std": 0.25575006008148193,
+          "C_mean": 2.3255274295806885,
+          "L_mean": 1.058163046836853
+        },
+        "ks_forecast": {
+          "ks_lom_r2": 0.993627667427063,
+          "den_haan_max_pct": 0.7385281920433044,
+          "den_haan_mean_pct": 0.27868929505348206
+        }
+      },
+      "distributional": {
+        "capital_gini": 0.22346385940500713,
+        "capital": {
+          "mean": 13.029374122619629,
+          "std": 5.1492204666137695,
+          "median": 10.957202911376953,
+          "p10": 7.434981822967529,
+          "p90": 20.46351432800293
+        },
+        "top_0.01_share": 0.017674772068858147,
+        "top_0.1_share": 0.16477236151695251,
+        "wealth_gini": 0.1999162291901928
+      }
+    }
+  ],
+  "final": {
+    "update_idx": 639,
+    "economic": {
+      "euler": {
+        "euler_mean_abs": 0.013059963472187519,
+        "euler_median_abs": 0.0062888264656066895,
+        "euler_p99_abs": 0.15263131260871887,
+        "euler_log10_mean_abs": -1.8840579986572266,
+        "constrained_frac": 0.0
+      },
+      "resource": {
+        "resource_mean_abs": 7.724761985627993e-07,
+        "resource_mean_rel": 5.0360949188643644e-08
+      },
+      "steady_state": {
+        "K_mean": 13.029374122619629,
+        "K_std": 0.25575006008148193,
+        "C_mean": 2.3255274295806885,
+        "L_mean": 1.058163046836853
+      },
+      "ks_forecast": {
+        "ks_lom_r2": 0.993627667427063,
+        "den_haan_max_pct": 0.7385281920433044,
+        "den_haan_mean_pct": 0.27868929505348206
+      }
+    },
+    "distributional": {
+      "capital_gini": 0.22346385940500713,
+      "capital": {
+        "mean": 13.029374122619629,
+        "std": 5.1492204666137695,
+        "median": 10.957202911376953,
+        "p10": 7.434981822967529,
+        "p90": 20.46351432800293
+      },
+      "top_0.01_share": 0.017674772068858147,
+      "top_0.1_share": 0.16477236151695251,
+      "wealth_gini": 0.1999162291901928
+    }
+  }
+}

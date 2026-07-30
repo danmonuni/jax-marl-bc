@@ -1,0 +1,8 @@
+{
+  "sigma": 0.0,
+  "seed": 8,
+  "delta": 0.025,
+  "n_snapshots": 30,
+  "sim_steps": 200,
+  "snapshot_spacing": "linear"
+}

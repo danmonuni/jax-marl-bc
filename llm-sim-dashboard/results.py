@@ -22,6 +22,10 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
+# Figures the framework no longer renders; older runs on disk may still have
+# them, and we don't want them surfacing in the UI.
+HIDDEN_FIGURES = {"economic.png", "ks_lom_evolution.png"}
+
 
 @dataclass
 class RunArtifacts:
@@ -75,13 +79,60 @@ def load(run_dir: Path) -> RunArtifacts:
 
     fig_dir = run_dir / "figures"
     if fig_dir.exists():
-        art.figures = sorted(fig_dir.glob("*.png"))
+        art.figures = sorted(p for p in fig_dir.glob("*.png")
+                             if p.name not in HIDDEN_FIGURES)
 
     roll = run_dir / "rollouts.npz"
     if roll.exists():
         art.rollouts_bytes = roll.stat().st_size
 
     return art
+
+
+def discover_runs(root: Path, max_depth: int = 4) -> List[Path]:
+    """Run directories under ``root``, newest first.
+
+    A directory is a run if it holds a resolved ``config.yaml`` plus at least
+    one recorded output. Detected by content rather than at a fixed ``*/*``
+    depth because not every run sits at ``runs/<exp>/<run_id>/``: the paper's
+    ``paper-ks-fig34`` keeps its record under ``results/ks/<cell>/``, and that
+    directory's own ``config.yaml`` is a protocol file, not a run.
+
+    Bounded walk: ``runs/`` also accumulates large local archives we must not
+    recurse into, so dotted and cache directories are skipped and the descent
+    stops at ``max_depth``.
+    """
+    root = Path(root)
+    if not root.exists():
+        return []
+    skip = {"__pycache__", "figures"}
+    found: List[Path] = []
+    frontier = [root]
+    for _ in range(max_depth):
+        nxt: List[Path] = []
+        for parent in frontier:
+            try:
+                children = [p for p in parent.iterdir() if p.is_dir()]
+            except OSError:
+                continue
+            for d in children:
+                if d.name.startswith(".") or d.name in skip:
+                    continue
+                if _is_run_dir(d):
+                    found.append(d)
+                else:
+                    nxt.append(d)
+        frontier = nxt
+        if not frontier:
+            break
+    return sorted(found, key=lambda p: p.stat().st_mtime, reverse=True)
+
+
+def _is_run_dir(path: Path) -> bool:
+    if not (path / "config.yaml").exists():
+        return False
+    return any((path / f).exists()
+               for f in ("metrics.csv", "diagnostics.json", "rollouts.npz"))
 
 
 def diagnostics_rows(diag: Optional[Dict[str, Any]]) -> Optional[pd.DataFrame]:

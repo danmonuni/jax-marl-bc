@@ -134,10 +134,6 @@ def run_single(
         if do_figures:
             plots.plot_training_health(metrics_np, recorder.figure_path("training_health.png"))
             if summary is not None:
-                plots.plot_economic_snapshots(
-                    summary, cfg.env.kind, steps_per_update,
-                    recorder.figure_path("economic.png"),
-                )
                 plots.plot_distributional_snapshots(
                     summary, steps_per_update, recorder.figure_path("distributional.png"),
                 )

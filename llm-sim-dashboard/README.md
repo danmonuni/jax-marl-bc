@@ -97,14 +97,17 @@ the model configures the run, it never executes anything itself.
 
 - **Timing** tiles (wall / run time, throughput, device).
 - **Final-snapshot diagnostics** tiles (Euler errors, Gini, …).
-- **Figures** (`training_health.png`, `economic.png`, `distributional.png`,
-  KS/RBC bespoke figures) rendered inline.
+- **Figures** (`training_health.png`, `distributional.png`, KS/RBC bespoke
+  figures) rendered inline — the list in `results.HIDDEN_FIGURES` is skipped.
 - **Training metrics** — `metrics.csv` as an interactive line chart + table.
 - **Diagnostics across snapshots** — flattened table + per-metric chart.
 - **Stored data** — the absolute run directory path, its file list, and a
   one-click **Download run (.zip)**.
 
-Past runs on disk can be reopened from the **📂 Browse runs** tab.
+Past runs on disk can be reopened from the **📂 Browse runs** tab, which finds
+them by content (`results.discover_runs`) rather than at a fixed depth under
+`runs/`, so records that don't sit at `runs/<exp>/<run_id>/` — e.g. the paper's
+`paper-ks-fig34/results/ks/<cell>/` — show up too.
 
 > Tip: for interactive use ask for a *quick* run (small `total_timesteps`, CPU).
 > Full `ks` budgets (500k steps) are designed for a GPU and take a long time.

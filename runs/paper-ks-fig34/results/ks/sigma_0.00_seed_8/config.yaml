@@ -1,0 +1,63 @@
+exp: ks
+env:
+  kind: ks
+  n_agents: 200
+  alpha: 0.36
+  beta: 0.95
+  delta: 0.025
+  b: 5.0
+  rho: 0.9
+  sigma: 0.01
+  max_steps: 200
+  k_init: 1.0
+  k_init_dist: uniform
+  k_init_resample: per_episode
+  k_init_sigma: 0.0
+  k_init_low: 10.0
+  k_init_high: 70.0
+  obs_vars:
+  - capital
+  - labour
+  - mean_capital
+  - aggregate_state
+  - kappa
+  - lambda
+  kappas: null
+  lambdas: null
+  n_grid: 3
+train:
+  num_envs: 12
+  rollout_len: 200
+  total_timesteps: 128000
+  update_epochs: 4
+  num_minibatches: 64
+  lr: 0.0003
+  gamma: 0.95
+  gae_lambda: 0.95
+  clip_eps: 0.2
+  vf_coef: 0.5
+  ent_coef: 0.0
+  anneal_lr: true
+  max_grad_norm: 0.5
+  log_every: 100
+net:
+  hidden_dims:
+  - 64
+  - 64
+  activation: tanh
+diag:
+  n_snapshots: 30
+  sim_steps: 200
+  n_agents: 200
+  economic: true
+  distributional: true
+  burn_frac: 0.5
+log:
+  out_dir: runs
+  run_name: ks_n200
+  save_raw: true
+  save_agents: 200
+run:
+  seed: 8
+  device: gpu
+  prealloc: true

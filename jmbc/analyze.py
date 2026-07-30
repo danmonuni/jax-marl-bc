@@ -50,8 +50,6 @@ def analyze_run(run_dir: str) -> dict:
 
     fig_dir = run_dir / "figures"
     fig_dir.mkdir(exist_ok=True)
-    plots.plot_economic_snapshots(summary, cfg.env.kind, steps_per_update,
-                                  str(fig_dir / "economic.png"))
     plots.plot_distributional_snapshots(summary, steps_per_update,
                                         str(fig_dir / "distributional.png"))
 

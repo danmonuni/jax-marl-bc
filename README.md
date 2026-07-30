@@ -56,9 +56,7 @@ runs/<exp>/<run_id>/
                        # aggregate state, ...) at each training snapshot
   figures/
     training_health.png      # PPO convergence panel
-    economic.png             # Euler error (+ KS R²/Den Haan) vs steps
     distributional.png       # Gini & top shares vs steps
-    ks_lom_evolution.png     # aggregate law of motion through training
     ks_wealth_heatmap.png    # wealth distribution vs training (density heatmap)
     <bespoke>.png            # rbc policy / ks_fig4 / figure5
 ```
@@ -147,7 +145,8 @@ jmbc/                    HOW it runs
 tests/                   env semantics, rollout, diagnostics checks
 llm-sim-dashboard/       Streamlit UI: describe a simulation in natural language,
                          an LLM maps it to a config, runs it, plots the results
-runs/                    generated output, ships empty (see runs/README.md)
+runs/                    generated output; only paper-ks-fig34/ (the paper's
+                         figures 3 & 4, complete record) ships — see runs/README.md
 ```
 
 Data flow: `configs/` → `jmbc.run` → `runs/<exp>/<run_id>/` (complete record,

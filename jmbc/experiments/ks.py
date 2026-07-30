@@ -25,7 +25,7 @@ def run(cfg, out_dir: str, run_id: str) -> dict:
             size_mb = (rec.dir / "rollouts.npz").stat().st_size / 1e6
             phase(f"raw rollouts saved: rollouts.npz ({size_mb:.1f} MB)")
         snap_steps = (np.asarray(idxs) + 1) * res["steps_per_update"]
-        phase("rendering KS figures (lom_evolution, wealth_heatmap, fig4) ...")
+        phase("rendering KS figures (wealth_heatmap, fig4) ...")
         render_ks_figures(recs, snap_steps, rec.fig_dir,
                           burn_frac=float(cfg.diag.burn_frac))
     print(f"[ks] {res['timing']['wall_time_s']:.1f}s -> {rec.dir}")

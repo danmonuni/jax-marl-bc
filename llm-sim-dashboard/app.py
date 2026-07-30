@@ -340,12 +340,11 @@ def browse_page() -> None:
         st.info("No runs directory yet — launch a simulation from the "
                 "**🚀 Run a simulation** tab first.")
         return
-    dirs = sorted((p for p in runs_root.glob("*/*") if p.is_dir()),
-                  key=lambda p: p.stat().st_mtime, reverse=True)
+    dirs = R.discover_runs(runs_root)
     if not dirs:
         st.info("No runs found yet.")
         return
-    labels = [f"{d.parent.name}/{d.name}" for d in dirs[:200]]
+    labels = [str(d.relative_to(runs_root)) for d in dirs[:200]]
     choice = st.selectbox(f"Pick a run ({len(dirs)} found, newest first)",
                           labels, key="browse_pick")
     if choice:

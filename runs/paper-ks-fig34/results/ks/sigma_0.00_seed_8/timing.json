@@ -1,0 +1,9 @@
+{
+  "device": "gpu",
+  "trace_time_s": 2.1003656949999936,
+  "compile_time_s": 8.926166013999989,
+  "run_time_s": 67.57009666200003,
+  "wall_time_s": 78.59666823099997,
+  "env_steps": 1536000,
+  "throughput_steps_per_s": 22731.94912955946
+}
