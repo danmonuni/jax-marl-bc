@@ -8,9 +8,8 @@ name. The generated file is a persistent, human-editable, reproducible artifact.
 How it derives from an existing template
 ----------------------------------------
 jmbc's loader supports a single ``extends: <base>`` level. Base templates
-(``rbc``/``ks``/``general``) have no ``extends``; the derived presets
-(``ks_local``/``ks_n20``/…) all ``extends: ks``. So to derive from *any*
-template we:
+(``rbc``/``ks``/``general``) have no ``extends``; derived presets such as
+``ks_local`` declare ``extends: ks``. So to derive from *any* template we:
 
 * walk its ``extends`` chain to the ultimate base,
 * inline the bodies of every non-base ancestor (so their deltas are preserved),

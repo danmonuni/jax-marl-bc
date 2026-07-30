@@ -29,7 +29,6 @@ pip install -r requirements.txt          # uses jax[cuda12] (pip-vendored CUDA)
 python -m jmbc.run exp=rbc                       # textbook + typical RBC
 python -m jmbc.run exp=ks                         # Krusell-Smith (full budget, Colab)
 python -m jmbc.run exp=ks_local                   # same KS economy, ~5 min on CPU
-python -m jmbc.run exp=ks_n20                     # KS at n = 20 / 200 / 2000 agents
 python -m jmbc.run exp=general                    # heterogeneous RBC grid
 
 # Override anything via OmegaConf dotlist:
@@ -76,24 +75,25 @@ directory, then iterate on diagnostics/figures locally against the saved data.
 
 ## Sweep / benchmark
 
+A sweep is a grid of overrides over one base experiment. Write
+`configs/sweep/<name>.yaml` (schema below), then:
+
 ```bash
-python -m jmbc.sweep sweep=scaling            # n_agents x num_envs scaling
-python -m jmbc.sweep sweep=scaling_smoke      # quick end-to-end check
-# the three headline scaling studies (Colab T4):
-python -m jmbc.sweep sweep=scaling_paper_ks   # KS, 1 env, matched budget vs the
-                                              # original paper's CPU times (Fig. 8)
-python -m jmbc.sweep sweep=scaling_phase      # agents x envs mesh -> phase diagram
-                                              # + constant-product-200 tradeoff cut
-python -m jmbc.sweep sweep=scaling_agents     # 5 envs, n_agents 1 -> 20000 (1-2-5)
+python -m jmbc.sweep sweep=<name>                        # run the grid
+python -m jmbc.sweep sweep=<name> train.total_timesteps=50000   # + CLI overrides
+python -m jmbc.sweep sweep=<name> replot=benchmarks/<name>      # figures only,
+                                                                # no training
 ```
 
 Writes `benchmarks/<name>/{results.csv,sweep.yaml}` (one row per cell with all
 timings and a canonical `time_s` column; `method` distinguishes series) plus
 the figures selected by the sweep's `figures` list. Timing separates JIT
 **compile time** from steady-state **run time** so throughput is measured
-fairly.
+fairly. Because each run persists its own resolved `sweep.yaml` next to the
+results, a completed sweep is self-documenting — the repository ships the
+schema, not a library of presets.
 
-Define your own sweep in `configs/sweep/<name>.yaml`:
+Schema — every field with its default:
 
 ```yaml
 name: my_sweep
@@ -128,9 +128,11 @@ in `runs/` (single experiments) or `benchmarks/` (sweeps), both git-ignored.
 
 ```
 configs/                 WHAT to run
-  base.yaml                shared defaults
-  exp/{rbc,ks,general}     one file per experiment
-  sweep/*.yaml             scaling / benchmark grids
+  base.yaml                shared defaults, inherited by every experiment
+  exp/{rbc,ks,general}     the three base templates (no `extends`)
+  exp/ks_local.yaml        derived preset: `extends: ks`, 5-minute CPU budget
+  sweep/<name>.yaml        your benchmark grids (none shipped; see Sweep above)
+  reference/*.csv          external baseline timings for `reference_csv`
 jmbc/                    HOW it runs
   run.py                   CLI: train one experiment      -> runs/<exp>/<id>/
   sweep.py                 CLI: benchmark grid            -> benchmarks/<name>/

@@ -1,6 +1,6 @@
 """Meta experiment / benchmark runner.
 
-    python -m jmbc.sweep sweep=scaling
+    python -m jmbc.sweep sweep=<name>      # reads configs/sweep/<name>.yaml
 
 Evaluates the Cartesian product of ``axes`` (or their zip, with ``paired``)
 for a base experiment, timing each cell (compile vs run split, throughput) and

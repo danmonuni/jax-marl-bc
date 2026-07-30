@@ -57,9 +57,9 @@ def build_params() -> List[Param]:
               "Base template to derive the new experiment config from. "
               "'rbc' = single-agent Real Business Cycle; 'ks' = Krusell-Smith "
               "heterogeneous-agent model; 'general' = heterogeneous RBC grid. "
-              "The 'ks_local' variant is a ~5-minute CPU budget; "
-              "ks_n20/n200/n2000 are population-scaling cells. Pick the closest "
-              "template; the other parameters override it.",
+              "The 'ks_local' variant is the same KS economy on a ~5-minute CPU "
+              "budget. Pick the closest template; the other parameters override "
+              "it (population size is set with 'n_agents', not by template).",
               enum=exps),
         Param("n_agents", "env.n_agents", "integer",
               "Number of economic agents in the population (KS/general). RBC is "
