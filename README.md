@@ -18,10 +18,13 @@ The package provides:
 ## Install
 
 ```bash
-pip install -e .
-# or, on a GPU instance (e.g. Colab T4):
-pip install -r requirements.txt          # uses jax[cuda12] (pip-vendored CUDA)
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
 ```
+
+One environment covers both the simulation and the dashboard. On Linux (e.g. a
+Colab T4) this pulls the pip-vendored CUDA 12 wheels; on macOS it installs
+CPU-only JAX. Run the commands below from the repo root.
 
 ## Run an experiment
 
@@ -159,11 +162,10 @@ no retraining).
 `llm-sim-dashboard/` is a Streamlit front end: describe an economy in natural
 language, an LLM maps the description onto a validated `configs/` file, the
 simulation runs through the same `jmbc.run` CLI, and the results come back as
-figures. It shells out to a separate interpreter, so the dashboard's
-dependencies stay independent of JAX.
+figures. It shells out to a subprocess rather than importing JAX in-process, so
+a slow or crashing run can't take the UI down with it.
 
 ```bash
-pip install -r llm-sim-dashboard/requirements.txt
 cp llm-sim-dashboard/.env.example llm-sim-dashboard/.env   # add your API key
 ./llm-sim-dashboard/run.sh
 ```

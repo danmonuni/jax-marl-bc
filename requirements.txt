@@ -1,16 +1,36 @@
-# Colab / CUDA-12 GPU install. For local CPU dev use: pip install -e .
-# jax 0.4.34 + flax 0.8.5 must stay pinned together (newer jax breaks flax 0.8.x,
-# newer flax requires newer jax; jaxmarl/distrax resolve around this pin).
-numpy
+# Single environment for everything: jmbc simulation + llm-sim-dashboard.
+#
+#   python3 -m venv .venv && source .venv/bin/activate
+#   pip install -r requirements.txt
+#   python -m jmbc.run exp=rbc            # run from the repo root
+#
+# Versions are those of a known-good working environment (Python 3.12).
+# On Linux, jax pulls the pip-vendored CUDA 12 wheels; elsewhere (macOS) it
+# installs CPU-only. Nothing else differs between the two platforms.
+
+# --- simulation (jmbc) ---
+jax[cuda12]==0.11.0; sys_platform == "linux"
+jax==0.11.0; sys_platform != "linux"
+jaxlib==0.11.0
+flax==0.12.8
+optax==0.2.8
+distrax==0.1.9
+chex==0.1.92
+jaxmarl==0.0.2
+gymnax==0.0.9
+omegaconf==2.3.1
+numpy==2.5.1
+scipy==1.18.0
+pandas==3.0.5
+matplotlib==3.11.1
+
+# --- dashboard (llm-sim-dashboard) ---
+streamlit==1.60.0
+altair==6.2.2
+openai==2.50.0
+python-dotenv==1.2.2
+requests==2.34.2
+PyYAML==6.0.3
+
+# --- tests ---
 pytest
-jax[cuda12]==0.4.34
-flax==0.8.5
-optax
-jaxmarl
-chex
-gymnax
-distrax
-matplotlib
-scipy
-omegaconf
-pandas

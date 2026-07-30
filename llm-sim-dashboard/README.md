@@ -37,22 +37,21 @@ are excluded from the list of base templates) and can be pruned with
 ## Setup
 
 ```bash
-# 1. install the DASHBOARD deps (streamlit + an LLM client)
-python -m pip install -r requirements.txt
+# 1. install deps (one environment for dashboard + simulation)
+python -m pip install -r ../requirements.txt
 
 # 2. configure
 cp .env.example .env
 #   - set OPENAI_API_KEY (for the OpenAI provider), and/or
 #   - set OLLAMA_HOST / OLLAMA_MODEL (for a local Ollama), and
-#   - set JMBC_PYTHON if jax + jmbc live in a different environment.
+#   - set JMBC_PYTHON only if jax + jmbc live in a different environment.
 ```
 
 This dashboard lives inside the repo, at `jax-marl-bc/llm-sim-dashboard/`, so
 `JMBC_REPO` defaults to the parent directory — no path config needed unless you
-move it. The environment that runs the simulation needs `jmbc` installed
-(`pip install -e .` from the repo root). By default that is the repo's own
-`.venv` if present, otherwise the interpreter running the dashboard; set
-`JMBC_PYTHON` to override.
+move it. The simulation runs in the repo's own `.venv` if present, otherwise in
+the interpreter running the dashboard; set `JMBC_PYTHON` to override. With the
+single-environment setup above, the default is already correct.
 
 ## Run
 
