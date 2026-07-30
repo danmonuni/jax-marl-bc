@@ -14,5 +14,3 @@ matplotlib
 scipy
 omegaconf
 pandas
-scikit-optimize  # Bayesian optimization (GP surrogate + EI) for
-                 # runs/ks-heterogeneous-returns/calibrate_kappa_scale.py

@@ -10,13 +10,13 @@ Two interpreters are involved on purpose:
 * the *simulation* interpreter (``JMBC_PYTHON``) needs ``jax`` + ``jaxmarl`` +
   ``jmbc``.
 
-On this machine those live in two separate conda envs (``py313`` and
-``jax313``), which is exactly why the runner shells out instead of importing
-JAX in-process.
+Those two may be the same interpreter or two different ones — the runner shells
+out rather than importing JAX in-process precisely so they can differ.
 """
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 try:
@@ -36,11 +36,13 @@ JMBC_REPO = Path(
     os.environ.get("JMBC_REPO", str(HERE.parent))
 ).resolve()
 
-# Interpreter that has jax + jaxmarl + jmbc installed. Defaults to the
-# jax313 conda env discovered on this machine; override via JMBC_PYTHON.
+# Interpreter that has jax + jaxmarl + jmbc installed. Prefers the repo's own
+# .venv, falls back to the interpreter running the dashboard; override with
+# JMBC_PYTHON when the two live in separate environments.
+_venv_python = JMBC_REPO / ".venv" / "bin" / "python"
 JMBC_PYTHON = os.environ.get(
     "JMBC_PYTHON",
-    str(Path.home() / "miniconda3" / "envs" / "jax313" / "bin" / "python"),
+    str(_venv_python) if _venv_python.exists() else sys.executable,
 )
 
 CONFIGS_DIR = JMBC_REPO / "configs"

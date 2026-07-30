@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
-# Launch the dashboard using the py313 conda env (streamlit + openai).
-# The simulation itself runs in JMBC_PYTHON (jax313) — see settings.py / .env.
+# Launch the dashboard (needs streamlit + an LLM client). Override the
+# interpreter with DASHBOARD_PYTHON; the simulation runs in JMBC_PYTHON
+# — see settings.py / .env.example.
 set -euo pipefail
 cd "$(dirname "$0")"
 
-PY="${DASHBOARD_PYTHON:-$HOME/miniconda3/envs/py313/bin/python}"
+if [ -n "${DASHBOARD_PYTHON:-}" ]; then
+  PY="$DASHBOARD_PYTHON"
+elif [ -x "../.venv/bin/python" ]; then
+  PY="../.venv/bin/python"
+else
+  PY="python3"
+fi
 
 exec "$PY" -m streamlit run app.py "$@"

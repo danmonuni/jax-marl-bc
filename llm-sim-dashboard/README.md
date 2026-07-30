@@ -37,27 +37,29 @@ are excluded from the list of base templates) and can be pruned with
 ## Setup
 
 ```bash
-# 1. install the DASHBOARD deps into the streamlit env (py313)
-~/miniconda3/envs/py313/bin/python -m pip install -r requirements.txt
+# 1. install the DASHBOARD deps (streamlit + an LLM client)
+python -m pip install -r requirements.txt
 
 # 2. configure
 cp .env.example .env
 #   - set OPENAI_API_KEY (for the OpenAI provider), and/or
 #   - set OLLAMA_HOST / OLLAMA_MODEL (for a local Ollama), and
-#   - confirm JMBC_PYTHON points at the env that has jax + jmbc.
+#   - set JMBC_PYTHON if jax + jmbc live in a different environment.
 ```
 
 This dashboard lives inside the repo, at `jax-marl-bc/llm-sim-dashboard/`, so
 `JMBC_REPO` defaults to the parent directory — no path config needed unless you
-move it. The simulation env (`jax313`) must already have `jmbc` installed
-(`pip install -e .` from the repo root) — it is on this machine.
+move it. The environment that runs the simulation needs `jmbc` installed
+(`pip install -e .` from the repo root). By default that is the repo's own
+`.venv` if present, otherwise the interpreter running the dashboard; set
+`JMBC_PYTHON` to override.
 
 ## Run
 
 ```bash
 ./run.sh
 # or explicitly:
-~/miniconda3/envs/py313/bin/python -m streamlit run app.py
+python -m streamlit run app.py
 ```
 
 Open the printed URL. In the sidebar you can toggle the **LLM provider**
@@ -74,7 +76,7 @@ Open the printed URL. In the sidebar you can toggle the **LLM provider**
 The runner is usable on its own — the LLM's job is just to produce this JSON:
 
 ```bash
-~/miniconda3/envs/py313/bin/python sim_runner.py \
+python sim_runner.py \
   '{"experiment":"rbc","total_timesteps":20000,"device":"cpu"}'
 ```
 

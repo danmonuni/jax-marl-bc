@@ -19,10 +19,8 @@ The package provides:
 
 ```bash
 pip install -e .
-# or, on a Colab T4 GPU instance:
+# or, on a GPU instance (e.g. Colab T4):
 pip install -r requirements.txt          # uses jax[cuda12] (pip-vendored CUDA)
-# or, on an aarch64 GPU cluster (e.g. GH200):
-pip install -r requirements-gh200.txt    # uses jax[cuda12-local] (module-provided CUDA)
 ```
 
 ## Run an experiment
@@ -31,9 +29,7 @@ pip install -r requirements-gh200.txt    # uses jax[cuda12-local] (module-provid
 python -m jmbc.run exp=rbc                       # textbook + typical RBC
 python -m jmbc.run exp=ks                         # Krusell-Smith (full budget, Colab)
 python -m jmbc.run exp=ks_local                   # same KS economy, ~5 min on CPU
-python -m jmbc.run exp=ks_remote                  # GPU-shaped: wide batches, short
-                                                  # serial chains; train n=200,
-                                                  # evaluate at diag.n_agents=2000
+python -m jmbc.run exp=ks_n20                     # KS at n = 20 / 200 / 2000 agents
 python -m jmbc.run exp=general                    # heterogeneous RBC grid
 
 # Override anything via OmegaConf dotlist:
@@ -147,26 +143,28 @@ jmbc/                    HOW it runs
   plots/                   style, training health, KS semantic figures, benchmarks
   recorder.py              run directory writer (config/metrics/rollouts/timing)
 tests/                   env semantics, rollout, diagnostics checks
-notebooks/               Colab (T4) runners: KS population runs, scaling benchmarks
-paper.md                 the systems paper draft
-.sources/                reference PDFs + the original pre-refactor PPO script
-.archive/                superseded generated outputs (pre-env-fix results)
+llm-sim-dashboard/       Streamlit UI: describe a simulation in natural language,
+                         an LLM maps it to a config, runs it, plots the results
+runs/                    generated output, ships empty (see runs/README.md)
 ```
 
 Data flow: `configs/` → `jmbc.run` → `runs/<exp>/<run_id>/` (complete record,
 incl. `rollouts.npz`) → `jmbc.analyze` (iterate on figures/diagnostics ex post,
 no retraining).
 
-## Notebooks (Colab T4 runners)
+## LLM simulation dashboard
 
-Both mount Drive **before** running and sync every result to
-`MyDrive/jax-marl-bc-runs/` as soon as it finishes, so a disconnect loses at
-most the run in progress:
+`llm-sim-dashboard/` is a Streamlit front end: describe an economy in natural
+language, an LLM maps the description onto a validated `configs/` file, the
+simulation runs through the same `jmbc.run` CLI, and the results come back as
+figures. It shells out to a separate interpreter, so the dashboard's
+dependencies stay independent of JAX.
 
-- `notebooks/colab_train_ks_populations.ipynb` — the full KS training runs at
-  n = 20 / 200 / 2000 (equal-learning protocol) → `runs/ks/ks_n*`, analyzed
-  locally afterwards with `jmbc.analyze`.
-- `notebooks/colab_scaling_benchmarks.ipynb` — the three scaling sweeps
-  (`scaling_paper_ks`, `scaling_phase`, `scaling_agents`) →
-  `benchmarks/<name>/`, including the paper-comparison speedup and the
-  agents × envs phase diagram.
+```bash
+pip install -r llm-sim-dashboard/requirements.txt
+cp llm-sim-dashboard/.env.example llm-sim-dashboard/.env   # add your API key
+./llm-sim-dashboard/run.sh
+```
+
+See [`llm-sim-dashboard/README.md`](llm-sim-dashboard/README.md) for the
+provider options (OpenAI or a local Ollama model) and configuration.

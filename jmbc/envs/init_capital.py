@@ -18,9 +18,8 @@ Distributions (``EnvConfig.k_init_dist``):
     are calibration-specific and must be rescaled if beta moves, not copied.
 ``lognormal``
     Mean-preserving spread of dispersion ``k_init_sigma`` around ``k_init``
-    (mu = -sigma^2/2, so E[k_i] = k_init for every sigma). Matches the kappa
-    convention in ``runs/ks-wealth-calibration``: sweeping sigma then varies
-    inequality without also moving aggregate K_0.
+    (mu = -sigma^2/2, so E[k_i] = k_init for every sigma), so sweeping sigma
+    varies inequality without also moving aggregate K_0.
 """
 import jax
 import jax.numpy as jnp

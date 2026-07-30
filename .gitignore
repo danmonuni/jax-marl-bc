@@ -47,22 +47,23 @@ paper.pdf
 results
 results/
 
-# Run OUTPUT is ignored; an experiment's SOURCE is not. Without these
-# exceptions every new runs/<experiment>/ had to be `git add -f`-ed by hand,
-# and one forgotten add means the Colab notebook clones a repo with no script
-# in it. Only the top level of each experiment dir is exempt, so the data
-# underneath (results/, raw/, rollouts.npz, figures) stays out of the repo.
+# runs/ is generated output only, and ships empty: a clone gets the directory
+# (via its README) and nothing else. Everything needed to produce a run lives
+# in configs/ + jmbc/, so nothing under runs/ is a source file.
 runs/*
-!runs/*/
-runs/*/*
-!runs/*/README.md
-!runs/*/*.py
-!runs/*/*.yaml
-!runs/*/*.csv
-.archive/
+!runs/README.md
+
 benchmarks/
+.archive/
 .sources/
+
+# Colab runners and local notebook scratch: not part of the published repo.
+notebooks/
 .ipynb_checkpoints/
+
+# Configs the dashboard generates at runtime (configs/exp/dash-*.yaml).
+configs/exp/dash-*.yaml
+
 .bal
 
 
