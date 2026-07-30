@@ -4,11 +4,17 @@ One KS run — the `sigma=0.0, seed=8` cell of the lognormal-kappa sweep that
 produces figure 6 — with its **whole training trajectory** recorded, so
 figures 3 and 4 are drawn from the same economy as figure 6.
 
-This is the only run shipped in the repository, and it ships complete: the
-protocol below, the two plotting scripts, and the full record of the training
-run under `results/ks/sigma_0.00_seed_8/` (see the table further down). The
-sweep itself is a local artefact, reproducible from `configs/` — this run is
-not, since it is the training trajectory that had to be recorded once.
+This is the only run shipped in the repository: the protocol below, the two
+plotting scripts, and the record of the training run under
+`results/ks/sigma_0.00_seed_8/` (see the table further down). The sweep itself
+is a local artefact, reproducible from `configs/` — this run is not, since it is
+the training trajectory that had to be recorded once.
+
+Everything ships except the raw `rollouts.npz`, which is 16 MB and would be the
+bulk of a clone. The rendered figures, metrics and diagnostics are all here, so
+the dashboard has a real run to display and the paper figures are readable as
+committed; regenerate the raw arrays with `rerun_fig34.py` if you need
+`plot_fig34.py` to redraw them from scratch.
 
 ## Why this is a run and not a replot
 
@@ -90,7 +96,7 @@ record actually used.
 | file | |
 |---|---|
 | `config.yaml` | the resolved config; the record states its own protocol |
-| `rollouts.npz` | every channel, snapshots stacked on a leading axis |
+| `rollouts.npz` | every channel, snapshots stacked on a leading axis — *not committed, see above* |
 | `metrics.csv` | per-update training metrics |
 | `timing.json` | trace/compile/run split, throughput, device |
 | `diagnostics.json` | economic + distributional probes at every snapshot |

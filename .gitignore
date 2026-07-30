@@ -50,13 +50,17 @@ results/
 # runs/ is generated output only: everything needed to produce a run lives in
 # configs/ + jmbc/, so a clone gets the directory (via its README) and nothing
 # else -- with one exception. runs/paper-ks-fig34/ is the run behind the paper's
-# figures 3 and 4, and ships complete (its own protocol + scripts, plus the full
-# record under results/) so those figures can be recomputed without retraining.
+# figures 3 and 4, and ships its protocol, scripts, figures and metrics so the
+# dashboard has a real run to display out of the box.
 runs/*
 !runs/README.md
 !runs/paper-ks-fig34/
 # Re-include the record: the bare `results/` rule further up would swallow it.
 !runs/paper-ks-fig34/results/
+# ...but not the raw rollouts: 16 MB of snapshot arrays, ~80% of the clone, and
+# the dashboard only reads their file size. Regenerate with rerun_fig34.py
+# (which writes them) when plot_fig34.py needs to redraw from raw.
+runs/paper-ks-fig34/results/**/rollouts.npz
 
 benchmarks/
 .archive/
