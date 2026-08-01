@@ -41,6 +41,16 @@ def _print_launch_summary(cfg, env, train_fn, seed: int) -> None:
         jax.random.PRNGKey(0), jax.numpy.zeros((env.obs_dim,)))
     n_params = sum(int(np.prod(p.shape)) for p in jax.tree_util.tree_leaves(params))
     lr = f"{c['LR']:g}" + (" (annealed)" if c.get("ANNEAL_LR") else " (constant)")
+
+    # num_minibatches need not divide the batch; the remainder is reshuffled
+    # away each epoch. Surface it — a large drop means the split is badly sized.
+    dropped = int(c.get("DROPPED_PER_EPOCH", 0))
+    drop_txt = ""
+    if dropped:
+        drop_pct = 100 * dropped / c["BATCH_SIZE"]
+        drop_txt = f" | {dropped:,} ({drop_pct:.1f}%) dropped/epoch (indivisible)"
+        if drop_pct > 5:
+            drop_txt += "  ** >5%: pick a num_minibatches closer to a divisor **"
     iface = "vector [n,d] arrays" if c.get("VEC_INTERFACE") else "jaxmarl per-agent dicts"
 
     # Device-memory forecast (fp32). Peak liveness in the update phase holds
@@ -71,7 +81,7 @@ def _print_launch_summary(cfg, env, train_fn, seed: int) -> None:
                      f" | {E} envs x {n} agents -> {seq_steps * E * n:,} transitions"),
         ("",         f"batch/update {R * E * n:,} | minibatch {c['MINIBATCH_SIZE']:,}"
                      f" x {c['NUM_MINIBATCHES']} | {c['UPDATE_EPOCHS']} epochs"
-                     f" | actors {c['NUM_ACTORS']:,}"),
+                     f" | actors {c['NUM_ACTORS']:,}{drop_txt}"),
         ("",         f"lr {lr} | gamma {c['GAMMA']} | clip {c['CLIP_EPS']}"
                      f" | ent {c['ENT_COEF']} | vf {c['VF_COEF']}"),
         ("network",  f"hidden {list(c['HIDDEN_DIMS'])} {c['ACTIVATION']}"

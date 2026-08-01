@@ -49,9 +49,24 @@ def make_train(env: MultiAgentEnv, config: dict):
     # environments advancing once in parallel), so the training length is
     # independent of how many envs run in parallel.
     config["NUM_UPDATES"] = config["TOTAL_TIMESTEPS"] // config["ROLLOUT_LEN"]
-    config["MINIBATCH_SIZE"] = (
-        config["NUM_ACTORS"] * config["ROLLOUT_LEN"] // config["NUM_MINIBATCHES"]
-    )
+    # NUM_MINIBATCHES need NOT divide the flat batch. The remainder
+    # (< NUM_MINIBATCHES samples) is dropped from the tail of a *fresh random
+    # permutation* every epoch, so no sample is systematically excluded.
+    # NUM_MINIBATCHES is kept exact rather than snapped to a divisor: every
+    # sweep cell then takes the same number of gradient steps per update, which
+    # is what makes cells comparable when n_agents (and so the batch) varies.
+    config["BATCH_SIZE"] = config["NUM_ACTORS"] * config["ROLLOUT_LEN"]
+    config["MINIBATCH_SIZE"] = config["BATCH_SIZE"] // config["NUM_MINIBATCHES"]
+    if config["MINIBATCH_SIZE"] < 1:
+        raise ValueError(
+            f"num_minibatches={config['NUM_MINIBATCHES']} exceeds the batch per "
+            f"update ({config['BATCH_SIZE']} = rollout_len {config['ROLLOUT_LEN']}"
+            f" x num_envs {config['NUM_ENVS']} x n_agents {env.num_agents}): "
+            f"each minibatch would be empty. Lower num_minibatches or raise "
+            f"num_envs / rollout_len / n_agents."
+        )
+    config["USED_BATCH_SIZE"] = config["MINIBATCH_SIZE"] * config["NUM_MINIBATCHES"]
+    config["DROPPED_PER_EPOCH"] = config["BATCH_SIZE"] - config["USED_BATCH_SIZE"]
 
     # Vector fast path: when the env exposes the array interface, skip the
     # per-agent dict round-trip entirely (trace size / runtime independent of
@@ -238,14 +253,23 @@ def make_train(env: MultiAgentEnv, config: dict):
                 train_state, traj_batch, advantages, targets, rng = update_state
                 rng, _rng = jax.random.split(rng)
 
-                batch_size = config["ROLLOUT_LEN"] * config["NUM_ACTORS"]
-                permutation = jax.random.permutation(_rng, batch_size)
+                batch_size = config["BATCH_SIZE"]
+                # Slicing the permutation (not the batch) drops the remainder
+                # from a freshly shuffled order each epoch: the excluded samples
+                # differ every time, so the truncation is unbiased.
+                permutation = jax.random.permutation(_rng, batch_size)[
+                    : config["USED_BATCH_SIZE"]
+                ]
 
                 batch = (traj_batch, advantages, targets)
                 flat_batch = jax.tree.map(lambda x: x.reshape((batch_size,) + x.shape[3:]), batch)
                 shuffled_batch = jax.tree.map(lambda x: jnp.take(x, permutation, axis=0), flat_batch)
                 minibatches = jax.tree.map(
-                    lambda x: jnp.reshape(x, [config["NUM_MINIBATCHES"], -1] + list(x.shape[1:])),
+                    lambda x: jnp.reshape(
+                        x,
+                        [config["NUM_MINIBATCHES"], config["MINIBATCH_SIZE"]]
+                        + list(x.shape[1:]),
+                    ),
                     shuffled_batch,
                 )
 
