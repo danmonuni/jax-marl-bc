@@ -23,8 +23,24 @@ from omegaconf import OmegaConf
 from .config import load_config, load_sweep, parse_cli, setup_device
 
 
+def _dot_value(v) -> str:
+    """Render a YAML-loaded override value in OmegaConf dotlist syntax.
+
+    Python repr is not that syntax: ``None`` must round-trip as ``null`` and
+    ``True`` as ``true``, or the merge assigns the *strings* "None"/"True" and
+    the structured schema rejects them (e.g. env.kappas: Optional[List[float]]).
+    """
+    if v is None:
+        return "null"
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, (list, tuple)):
+        return "[" + ",".join(_dot_value(x) for x in v) + "]"
+    return str(v)
+
+
 def _overrides_to_dotlist(d: Dict) -> List[str]:
-    return [f"{k}={v}" for k, v in d.items()]
+    return [f"{k}={_dot_value(v)}" for k, v in d.items()]
 
 
 def build_combos(axes: Dict[str, List], paired: bool = False) -> List[tuple]:
@@ -42,6 +58,109 @@ def build_combos(axes: Dict[str, List], paired: bool = False) -> List[tuple]:
                 f"{ {k: len(v) for k, v in axes.items()} }")
         return list(zip(*value_lists))
     return list(itertools.product(*value_lists))
+
+
+def resolve_seeds(scfg, base_seed: int) -> List[int]:
+    """The RNG seeds each cell is re-run under.
+
+    Explicit ``seeds: [0, 1, 2]`` wins; otherwise the legacy ``repeats: N``
+    means base_seed + 0..N-1, which is what the runner always did implicitly.
+    """
+    seeds = OmegaConf.to_container(scfg.seeds, resolve=True) if scfg.seeds else None
+    if seeds:
+        return [int(s) for s in seeds]
+    return [base_seed + r for r in range(int(scfg.repeats))]
+
+
+def write_results(df, axes: Dict[str, List], out_dir: Path, write_raw: bool = True):
+    """Write the per-seed table and its per-cell mean/std collapse.
+
+    results.csv         one row per (cell, seed) — the raw sample
+    results_summary.csv one row per cell — mean/std/sem/min/max + n_seeds
+
+    ``write_raw=False`` regenerates only the summary (replot reads results.csv
+    and must not rewrite its own input).
+    """
+    from .plots import summarize_repeats
+
+    if write_raw:
+        csv_path = out_dir / "results.csv"
+        df.to_csv(csv_path, index=False)
+        print(f"\nWrote {csv_path}  ({len(df)} rows)")
+
+    axis_cols = [a.split(".")[-1] for a in axes]
+    summary = summarize_repeats(df, axis_cols)
+    sum_path = out_dir / "results_summary.csv"
+    summary.to_csv(sum_path, index=False)
+    print(f"Wrote {sum_path}  ({len(summary)} cells)")
+    return summary
+
+
+def print_summary(summary, axis_cols: List[str]) -> None:
+    """Console rendering of the per-cell timing statistics."""
+    cols = [c for c in ["method", *axis_cols] if c in summary.columns]
+    print("\nper-cell timing (mean +- sample std over seeds)")
+    for _, r in summary.iterrows():
+        cell = " ".join(f"{c}={r[c]}" for c in cols)
+        n = int(r["n_seeds"])
+        std = float(r.get("time_s_std", float("nan")) or float("nan"))
+        ok = n > 1 and std == std                    # NaN-safe: n>=2 and finite
+        std_txt = f"{std:8.2f}s" if ok else "     n/a"
+        cv = f"  cv={100 * std / r['time_s_mean']:.1f}%" \
+            if ok and r["time_s_mean"] else ""
+        print(f"  {cell:<44} {r['time_s_mean']:10.2f}s +- {std_txt}  "
+              f"(n={n}){cv}")
+
+
+def cell_config(scfg, combo: Sequence):
+    """The fully resolved experiment config for one cell, exactly as the
+    runner builds it: sweep ``overrides`` first, then the cell's axis values.
+
+    Public so a sweep can be *validated* — printed, diffed against another
+    sweep — before committing hours of GPU time to it. Imports no JAX.
+    """
+    base_over = _overrides_to_dotlist(
+        OmegaConf.to_container(scfg.overrides, resolve=True))
+    keys = list(OmegaConf.to_container(scfg.axes, resolve=True) or {})
+    return load_config(
+        scfg.base_exp,
+        base_over + [f"{k}={v}" for k, v in zip(keys, combo)])
+
+
+def _cell_key(axis_cols: Sequence[str], values: Sequence, seed) -> tuple:
+    """Identity of one timed run: its axis values plus its seed.
+
+    Stringified because the same cell arrives as YAML ints when running and as
+    numpy/pandas scalars when read back from results.csv on resume.
+    """
+    def norm(v):
+        try:                                    # 10, 10.0, "10" -> "10"
+            return str(int(float(v)))
+        except (TypeError, ValueError):
+            return str(v)
+    return tuple(norm(v) for v in (*values, seed))
+
+
+def load_done(out_dir: Path, axis_cols: Sequence[str]):
+    """Rows already in ``out_dir/results.csv``, and the set of (cell, seed)
+    keys they cover. Returns ([], set()) when there is nothing to resume from.
+    """
+    import pandas as pd
+
+    csv_path = out_dir / "results.csv"
+    if not csv_path.exists():
+        return [], set()
+    df = pd.read_csv(csv_path)
+    missing = [c for c in (*axis_cols, "seed") if c not in df.columns]
+    if missing:
+        print(f"[resume] ignoring {csv_path}: no {', '.join(missing)} column "
+              f"(pre-multiseed file) — every cell will be re-run")
+        return [], set()
+    rows = df.to_dict("records")
+    done = {_cell_key(axis_cols, [r[c] for c in axis_cols], r["seed"])
+            for r in rows}
+    print(f"[resume] {csv_path}: {len(rows)} run(s) already timed")
+    return rows, done
 
 
 def load_reference(path_str: str):
@@ -91,10 +210,12 @@ def replot(scfg, results_dir: Path) -> None:
         raise FileNotFoundError(f"no results.csv under {results_dir}")
     df = ensure_time_column(pd.read_csv(csv_path))
     print(f"replotting from {csv_path}  ({len(df)} rows)")
+    axes = OmegaConf.to_container(scfg.axes, resolve=True) or {}
+    summary = write_results(df, axes, results_dir, write_raw=False)
+    print_summary(summary, [k.split(".")[-1] for k in axes])
     if scfg.reference_csv:
         ref = load_reference(str(scfg.reference_csv))
         df = pd.concat([df, ref], ignore_index=True)
-    axes = OmegaConf.to_container(scfg.axes, resolve=True) or {}
     figs = make_sweep_figures(
         df, axes, str(results_dir), figures=list(scfg.figures),
         tradeoff_product=(int(scfg.tradeoff_product)
@@ -139,29 +260,38 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
     keys = list(axes)
     combos = build_combos(axes, paired=bool(scfg.paired))
 
-    out_dir = Path("benchmarks") / scfg.name
+    out_dir = Path(str(scfg.out_dir)) / scfg.name
     out_dir.mkdir(parents=True, exist_ok=True)
     OmegaConf.save(scfg, out_dir / "sweep.yaml")
 
-    rows: List[dict] = []
-    total = len(combos) * scfg.repeats
+    seeds = resolve_seeds(scfg, int(base_cfg.run.seed))
+    axis_cols = [k.split(".")[-1] for k in keys]
+    print(f"[sweep] {len(combos)} cells x {len(seeds)} seed(s) {seeds} "
+          f"-> {out_dir}")
+
+    rows, done = load_done(out_dir, axis_cols) if scfg.resume else ([], set())
+    total = len(combos) * len(seeds)
     n = 0
     for combo in combos:
-        for rep in range(scfg.repeats):
+        for rep, seed in enumerate(seeds):
             n += 1
-            dotlist = base_over + [f"{k}={v}" for k, v in zip(keys, combo)]
-            cfg = load_config(scfg.base_exp, dotlist)
+            if _cell_key(axis_cols, combo, seed) in done:
+                print(f"[sweep {n}/{total}] "
+                      + ", ".join(f"{c}={v}" for c, v in zip(axis_cols, combo))
+                      + f" seed={seed} — already done, skipping")
+                continue
+            cfg = cell_config(scfg, combo)
             tag = ", ".join(f"{k.split('.')[-1]}={v}" for k, v in zip(keys, combo))
-            print(f"[sweep {n}/{total}] {tag} rep={rep}")
+            print(f"[sweep {n}/{total}] {tag} seed={seed} (rep {rep})")
             recorder = None
             if scfg.save_cell_runs:
                 slug = "_".join(f"{k.split('.')[-1]}{v}" for k, v in zip(keys, combo))
                 recorder = RunRecorder(str(out_dir / "cells"), scfg.base_exp,
-                                       f"{slug or 'base'}_rep{rep}")
+                                       f"{slug or 'base'}_seed{seed}")
             res = run_single(
                 cfg,
                 recorder=recorder,
-                seed=int(cfg.run.seed) + rep,
+                seed=seed,
                 do_diagnostics=bool(scfg.collect_diagnostics),
                 do_figures=bool(scfg.save_cell_runs),
                 benchmark=bool(scfg.benchmark),
@@ -173,7 +303,8 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
             # bare name so every existing sweep's figures are unaffected.
             device_tag = res["timing"].get("device") or "unknown"
             method = "jaxmarl-bc" if device_tag == "gpu" else f"jaxmarl-bc-{device_tag}"
-            row = {"method": method, "base_exp": scfg.base_exp, "repeat": rep}
+            row = {"method": method, "base_exp": scfg.base_exp,
+                   "repeat": rep, "seed": seed}
             for k, v in zip(keys, combo):
                 row[k.split(".")[-1]] = v
             row["n_agents"] = int(cfg.env.n_agents)
@@ -187,11 +318,14 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
             print(f"    run={run_s:.2f}s "
                   f"throughput={t.get('throughput_steps_per_s', 0):.3e} steps/s "
                   f"device={t.get('device')}")
+            # Flush after every cell: a multi-hour scan that loses its session
+            # keeps everything timed so far, and `resume: true` picks up here.
+            ensure_time_column(pd.DataFrame(rows)).to_csv(
+                out_dir / "results.csv", index=False)
 
     df = ensure_time_column(pd.DataFrame(rows))
-    csv_path = out_dir / "results.csv"
-    df.to_csv(csv_path, index=False)
-    print(f"\nWrote {csv_path}  ({len(df)} rows)")
+    summary = write_results(df, axes, out_dir)
+    print_summary(summary, [k.split(".")[-1] for k in keys])
 
     if scfg.reference_csv:
         ref = load_reference(str(scfg.reference_csv))

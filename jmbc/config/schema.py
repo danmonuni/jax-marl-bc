@@ -155,8 +155,21 @@ class SweepConfig:
     base_exp: str = "rbc"
     axes: Dict[str, List[Any]] = field(default_factory=dict)
     overrides: Dict[str, Any] = field(default_factory=dict)
+    # How many times each cell is re-run, and with which RNG seeds. Give
+    # ``seeds`` explicitly ([0, 1, 2]) when the repeats are the sample over
+    # which timings get a mean and a standard deviation — the seed then
+    # appears in results.csv and cells are collapsed in results_summary.csv.
+    # ``repeats`` (legacy) is equivalent to seeds = run.seed + [0..repeats-1].
     repeats: int = 1
+    seeds: Optional[List[int]] = None
     name: str = "sweep"
+    # Parent directory of the sweep's output dir (<out_dir>/<name>/).
+    # "benchmarks" for throwaway timing scans; "runs" for a kept experiment.
+    out_dir: str = "benchmarks"
+    # Skip (cell, seed) pairs already present in the output dir's results.csv
+    # and keep their rows. results.csv is flushed after every cell, so a
+    # multi-hour scan that loses its Colab session resumes where it stopped.
+    resume: bool = False
     collect_diagnostics: bool = True   # also tabulate Euler/Gini per cell
     save_cell_runs: bool = False       # full per-cell output dir + figures
                                        # (distributional/economic/training health)

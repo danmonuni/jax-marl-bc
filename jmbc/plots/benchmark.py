@@ -51,6 +51,58 @@ def ensure_time_column(df):
     return df
 
 
+# Timing/rate columns that get mean/std/sem/min/max in results_summary.csv.
+STAT_COLS = ("time_s", "run_time_s", "wall_time_s", "compile_time_s",
+             "trace_time_s", "throughput_steps_per_s")
+# Cell identity carried through aggregation unchanged (constant within a cell).
+ID_COLS = ("base_exp", "device", "n_agents", "num_envs", "total_timesteps",
+           "env_steps")
+
+
+def summarize_repeats(df, axis_cols, group_col: str = "method"):
+    """Collapse the per-seed rows of a sweep to one row per cell.
+
+    Returns a table keyed by ``group_col`` + the swept axes, carrying
+    ``<col>_mean/_std/_sem/_min/_max`` for every timing column plus ``n_seeds``
+    and the seed list. Standard deviations are the SAMPLE std (ddof=1), so a
+    single-seed cell reports NaN rather than a misleading 0.
+    """
+    import pandas as pd  # noqa: F401  (groupby machinery)
+
+    df = ensure_time_column(df)
+    keys = [c for c in [group_col, *axis_cols]
+            if c in df.columns and c is not None]
+    if not keys:
+        raise ValueError("summarize_repeats needs at least one grouping column")
+    value_cols = [c for c in STAT_COLS if c in df.columns]
+    g = df.groupby(keys, dropna=False)
+
+    out = g[value_cols].agg(["mean", "std", "sem", "min", "max"])
+    out.columns = [f"{col}_{stat}" for col, stat in out.columns]
+    out.insert(0, "n_seeds", g.size())
+    if "seed" in df.columns:
+        out.insert(1, "seeds", g["seed"].agg(
+            lambda s: ",".join(str(int(v)) for v in sorted(s.dropna().unique()))))
+    for c in ID_COLS:                       # identity, constant within a cell
+        if c in df.columns and c not in keys:
+            out[c] = g[c].first()
+    return out.reset_index().sort_values(keys)
+
+
+def _mean_std(sub, x: str, y: str):
+    """Per-x mean, sample std (0 where undefined) and repeat count."""
+    stat = sub.groupby(x)[y].agg(["mean", "std", "count"]).sort_index()
+    return stat["mean"], stat["std"].fillna(0.0), stat["count"]
+
+
+def _yerr(mean, std, loglog: bool):
+    """Symmetric std whiskers, with the lower arm kept strictly positive so a
+    log y-axis can render it (only bites when std >= mean, i.e. never for
+    well-behaved timings)."""
+    lo = np.minimum(std.values, mean.values * (1 - 1e-3)) if loglog else std.values
+    return np.vstack([np.clip(lo, 0.0, None), std.values])
+
+
 def _series_iter(df, group_col):
     if group_col and group_col in df.columns:
         keys = list(df[group_col].unique())  # first-seen order: ours first
@@ -67,24 +119,38 @@ def plot_metric_vs(df, x: str, y: str, path: str, group_col: str = "method",
 
     Repeats (and any other swept axis) are averaged per x value; series with
     no finite y data (e.g. a reference CSV without throughput) are skipped.
+    Multi-seed cells additionally get +-1 sample-std whiskers, and the caption
+    records how many seeds the mean is over.
     """
     import matplotlib.pyplot as plt
     apply_style()
     fig, ax = plt.subplots(figsize=(6, 4.2))
-    n_series = 0
+    n_series, seed_counts = 0, set()
     for label, sub, color in _series_iter(df, group_col):
         sub = sub.dropna(subset=[x, y])
         if sub.empty:
             continue
-        agg = sub.groupby(x)[y].mean().sort_index()
-        ax.plot(agg.index, agg.values, "o-", color=color, label=label)
+        mean, std, count = _mean_std(sub, x, y)
+        seed_counts.update(int(c) for c in count.values)
+        if (count > 1).any() and float(std.max()) > 0:
+            ax.errorbar(mean.index, mean.values, yerr=_yerr(mean, std, loglog),
+                        fmt="o-", color=color, label=label,
+                        capsize=3, elinewidth=1, markersize=4)
+        else:
+            ax.plot(mean.index, mean.values, "o-", color=color, label=label)
         n_series += 1
     if loglog:
         ax.set_xscale("log"); ax.set_yscale("log")
-    ax.set_xlabel(x)
+    ax.set_xlabel(axis_label(x))
     ax.set_ylabel(ylabel or y)
     if title:
         ax.set_title(title)
+    if seed_counts and max(seed_counts) > 1:
+        reps = (f"{min(seed_counts)}-{max(seed_counts)}"
+                if len(seed_counts) > 1 else f"{max(seed_counts)}")
+        ax.annotate(f"mean $\\pm$ 1 s.d. over {reps} seeds",
+                    xy=(0.02, 0.02), xycoords="axes fraction", fontsize=7,
+                    color="0.35")
     if n_series > 1:
         ax.legend()
     fig.tight_layout()

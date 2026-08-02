@@ -10,6 +10,35 @@ Runs are generated output, not source — the inputs to every experiment are
 `configs/` (what to run) and `jmbc/` (how it runs) — so this directory is
 git-ignored and populated locally, with one exception.
 
+## Sweeps
+
+`python -m jmbc.sweep sweep=<name>` writes a *scan* rather than a single run,
+into `<out_dir>/<name>/` (`out_dir: benchmarks` by default; the multi-seed
+scaling scans set `out_dir: runs` so their record is kept here):
+
+```
+sweep.yaml           # the resolved sweep spec, as run
+results.csv          # ONE ROW PER (cell, seed) — the raw timing sample
+results_summary.csv  # ONE ROW PER CELL — mean/std/sem/min/max + n_seeds, seeds
+*.png                # the figures named by the sweep's `figures` list
+```
+
+When a sweep declares `seeds: [0, 1, 2]`, each cell is trained once per seed;
+`results_summary.csv` is the descriptive-statistics collapse of those repeats
+(sample std, ddof=1 — a single-seed cell reports NaN, not 0), and the walltime
+and throughput figures plot the mean with ±1 s.d. whiskers. Regenerate the
+summary and the figures from a finished `results.csv` without retraining:
+
+```bash
+python -m jmbc.sweep sweep=<name> replot=runs/<name>
+```
+
+The two population-scaling scans are
+[`configs/sweep/scan_agents_multiseed_gpu.yaml`](../configs/sweep/scan_agents_multiseed_gpu.yaml)
+and its CPU twin — same protocol, `run.device` apart. Each config pins every
+schema field it depends on, so a cell inherits nothing implicitly from
+`configs/base.yaml` or `configs/exp/ks.yaml`.
+
 ## The one run in the repository
 
 [`paper-ks-fig34/`](paper-ks-fig34) is the experiment behind the paper's

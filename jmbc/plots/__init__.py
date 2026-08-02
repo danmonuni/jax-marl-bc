@@ -16,6 +16,7 @@ from .benchmark import (
     make_benchmark_figures,
     make_sweep_figures,
     ensure_time_column,
+    summarize_repeats,
 )
 
 __all__ = [
@@ -36,4 +37,5 @@ __all__ = [
     "make_benchmark_figures",
     "make_sweep_figures",
     "ensure_time_column",
+    "summarize_repeats",
 ]

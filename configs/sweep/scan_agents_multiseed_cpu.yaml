@@ -1,0 +1,111 @@
+# ==========================================================================
+# Population scaling on CPU, 3 seeds per cell — the hardware twin of
+# scan_agents_multiseed_gpu.yaml.
+#
+#   python -m jmbc.sweep sweep=scan_agents_multiseed_cpu
+#
+# Same compiled tensor program, same economy, same PPO budget, same seeds;
+# the ONLY difference from the GPU sweep is `run.device: cpu` (and the trimmed
+# axis below). That isolates the hardware axis from the architecture axis:
+# runs/paper-ks-fig34 and the reference CSV already contrast a compiled program
+# against the original MARL-BC Python loop; this contrasts THIS program on GPU
+# against THIS program on CPU, holding the code identical.
+#
+# This file is SELF-CONTAINED by construction: `overrides` pins every field of
+# the experiment schema that this sweep depends on, so the cells do not silently
+# inherit anything from configs/base.yaml or configs/exp/ks.yaml. Only
+# `env.n_agents` (the axis) and `run.seed` (the repeat) vary across cells.
+#
+# AXIS IS TRIMMED relative to the GPU sweep: it stops at 10,000 agents rather
+# than 200,000. Measured single-seed CPU times from the previous scan
+# (runs/scan_dingle_agent_CPU): 1,000 agents = 540 s, 5,000 = 2,932 s,
+# 10,000 = 6,368 s, i.e. cleanly linear above ~100 agents. Extrapolating,
+# 200,000 agents would be ~35 hours PER SEED. The whole trimmed axis at 3 seeds
+# is ~9.7 hours; the flat-vs-linear knee the figure is about is already fully
+# resolved by 10,000. Extend the axis back out only if you have days to spend —
+# the GPU sweep carries the tail.
+#
+# Rows are auto-tagged method="jaxmarl-bc-cpu" (the GPU sweep's are
+# "jaxmarl-bc"), so this results.csv is already reference_csv-shaped: feed it
+# to the GPU sweep's replot to overlay both series and get the speedup figure.
+# ==========================================================================
+name: scan_agents_multiseed_CPU
+out_dir: runs                 # -> runs/scan_agents_multiseed_CPU/
+base_exp: ks
+
+# ── what varies ───────────────────────────────────────────────────────────
+# The GPU axis truncated after 10,000 (see the note above). Every value here
+# also appears in the GPU axis, so the two curves share every x for the
+# speedup ratio.
+axes:
+  env.n_agents: [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000]
+
+# Repeats are seeds, not anonymous reruns: they land in results.csv as a
+# `seed` column and are collapsed to mean/std/sem in results_summary.csv.
+seeds: [0, 1, 2]
+
+# ── what is held fixed (complete, explicit; identical to the GPU sweep
+#    except run.device / run.prealloc) ──────────────────────────────────────
+overrides:
+  # -- economy: Krusell-Smith, homogeneous agents, every agent at k_0 = 1 ---
+  env.kind: ks
+  env.alpha: 0.36
+  env.beta: 0.95
+  env.delta: 0.025
+  env.max_steps: 5000               # episode length (steps before reset)
+  env.k_init: 1.0
+  env.k_init_dist: constant         # every agent starts at k_init
+  env.k_init_resample: per_episode  # inert under k_init_dist=constant
+  env.k_init_sigma: 0.0
+  env.k_init_low: 3.0               # inert under k_init_dist=constant
+  env.k_init_high: 20.0             # inert under k_init_dist=constant
+  env.obs_vars: [capital, labour, mean_capital, aggregate_state, kappa, lambda]
+  env.kappas: null                  # null -> ones(n_agents): homogeneous
+  env.lambdas: null                 # null -> ones(n_agents): homogeneous
+
+  # -- PPO: fixed sequential budget per cell, independent of n_agents -------
+  train.num_envs: 1                 # single environment: n_agents is the only width
+  train.rollout_len: 200
+  train.total_timesteps: 100000     # 100,000 / 200 = 500 updates per cell
+  train.update_epochs: 4
+  train.num_minibatches: 64
+  train.lr: 3.0e-4
+  train.anneal_lr: true
+  train.gamma: 0.95
+  train.gae_lambda: 0.95
+  train.clip_eps: 0.2
+  train.vf_coef: 0.5
+  train.ent_coef: 0.0
+  train.max_grad_norm: 0.5
+  train.log_every: 100              # heartbeat only; no effect on the XLA graph
+
+  # -- network: same 4,739-parameter actor-critic at every n_agents ---------
+  net.hidden_dims: [64, 64]
+  net.activation: tanh
+
+  # -- diagnostics: OFF. This is a timing scan; Euler/Gini probes would add
+  #    untimed post-training work and dominate the small cells. ------------
+  diag.economic: false
+  diag.distributional: false
+  diag.n_snapshots: 200             # inert: collect_diagnostics is false
+  diag.sim_steps: 5000              # inert: collect_diagnostics is false
+  diag.burn_frac: 0.5               # inert: collect_diagnostics is false
+  diag.n_agents: null
+
+  # -- execution -----------------------------------------------------------
+  run.device: cpu                   # THE difference from the GPU sweep
+  run.prealloc: false               # no GPU pool to preallocate
+  run.seed: 0                       # superseded per-cell by `seeds` above
+
+# ── output ────────────────────────────────────────────────────────────────
+# results.csv is flushed after EVERY cell, so an interrupted scan keeps what it
+# timed. Re-running with resume=true skips the (cell, seed) pairs already in it:
+#   python -m jmbc.sweep sweep=scan_agents_multiseed_cpu resume=true
+resume: false                       # set true to continue an interrupted scan
+collect_diagnostics: false          # no per-cell diagnostics in results.csv
+save_cell_runs: false               # timings only, no per-cell run directories
+paired: false                       # single axis; irrelevant here
+benchmark: false                    # AOT phase timer already isolates run time
+figures: [walltime, throughput]     # both get +-1 s.d. whiskers across seeds
+reference_csv: null
+tradeoff_product: null
