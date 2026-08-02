@@ -3,11 +3,15 @@
 #
 #   python -m jmbc.sweep sweep=scan_agents_multiseed_gpu
 #
-# Protocol (identical to runs/scan_dingle_agent_CPU, except run.device and the
-# extended n_agents tail): one environment, a fixed 100,000-sequential-step
-# budget per cell (500 PPO updates of rollout_len 200), n_agents swept on a
-# 1-2-5 progression from 1 to 200,000. Each cell is re-run under seeds 0, 1, 2
-# so every timing gets a mean and a sample standard deviation.
+# Protocol: one environment, a fixed 100,000-sequential-step budget per cell
+# (500 PPO updates of rollout_len 200), n_agents swept on a 1-2-5 progression
+# from 1 to 200,000. Each cell is re-run under seeds 0, 1, 2 so every timing
+# gets a mean and a sample standard deviation.
+#
+# The ECONOMY follows runs/paper-ks-fig34/config.yaml -- 200-step episodes and
+# U(10, 70) starting capital redrawn per episode -- NOT the 5,000-step / k_0 = 1
+# setup that runs/scan_dingle_agent_CPU inherited from configs/exp/ks.yaml.
+# The PPO budget and the timing harness are otherwise that scan's.
 #
 # This file is SELF-CONTAINED by construction: `overrides` pins every field of
 # the experiment schema that this sweep depends on, so the cells do not silently
@@ -53,13 +57,18 @@ overrides:
   env.alpha: 0.36
   env.beta: 0.95
   env.delta: 0.025
-  env.max_steps: 5000               # episode length (steps before reset)
-  env.k_init: 1.0
-  env.k_init_dist: constant         # every agent starts at k_init
-  env.k_init_resample: per_episode  # inert under k_init_dist=constant
-  env.k_init_sigma: 0.0
-  env.k_init_low: 3.0               # inert under k_init_dist=constant
-  env.k_init_high: 20.0             # inert under k_init_dist=constant
+  env.max_steps: 200                # episode length = rollout_len: one reset
+                                    # per rollout, as runs/paper-ks-fig34
+  # Starting capital: the reference KS draw, U(10, 70) per agent, redrawn at
+  # every episode reset. Pinned to runs/paper-ks-fig34/config.yaml -- NOT the
+  # k_0 = 1 constant that configs/exp/ks.yaml still carries for the pre-2026-07
+  # runs, and NOT the beta-rescaled U(3, 20) the schema defaults to.
+  env.k_init_dist: uniform
+  env.k_init_low: 10.0
+  env.k_init_high: 70.0
+  env.k_init_resample: per_episode  # new population at every reset
+  env.k_init: 1.0                   # inert under k_init_dist=uniform
+  env.k_init_sigma: 0.0             # inert under k_init_dist=uniform
   env.obs_vars: [capital, labour, mean_capital, aggregate_state, kappa, lambda]
   env.kappas: null                  # null -> ones(n_agents): homogeneous
   env.lambdas: null                 # null -> ones(n_agents): homogeneous
@@ -89,7 +98,7 @@ overrides:
   diag.economic: false
   diag.distributional: false
   diag.n_snapshots: 200             # inert: collect_diagnostics is false
-  diag.sim_steps: 5000              # inert: collect_diagnostics is false
+  diag.sim_steps: 200               # inert: collect_diagnostics is false
   diag.burn_frac: 0.5               # inert: collect_diagnostics is false
   diag.n_agents: null
 

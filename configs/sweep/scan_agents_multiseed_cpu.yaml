@@ -4,7 +4,8 @@
 #
 #   python -m jmbc.sweep sweep=scan_agents_multiseed_cpu
 #
-# Same compiled tensor program, same economy, same PPO budget, same seeds;
+# Same compiled tensor program, same economy (200-step episodes, U(10, 70)
+# starting capital, per runs/paper-ks-fig34), same PPO budget, same seeds;
 # the ONLY difference from the GPU sweep is `run.device: cpu` (and the trimmed
 # axis below). That isolates the hardware axis from the architecture axis:
 # runs/paper-ks-fig34 and the reference CSV already contrast a compiled program
@@ -18,8 +19,9 @@
 #
 # AXIS IS TRIMMED relative to the GPU sweep: it stops at 10,000 agents rather
 # than 200,000. Measured single-seed CPU times from the previous scan
-# (runs/scan_dingle_agent_CPU): 1,000 agents = 540 s, 5,000 = 2,932 s,
-# 10,000 = 6,368 s, i.e. cleanly linear above ~100 agents. Extrapolating,
+# (runs/scan_dingle_agent_CPU, which ran the old economy but the same PPO
+# budget): 1,000 agents = 540 s, 5,000 = 2,932 s, 10,000 = 6,368 s, i.e.
+# cleanly linear above ~100 agents. Extrapolating,
 # 200,000 agents would be ~35 hours PER SEED. The whole trimmed axis at 3 seeds
 # is ~9.7 hours; the flat-vs-linear knee the figure is about is already fully
 # resolved by 10,000. Extend the axis back out only if you have days to spend —
@@ -52,13 +54,18 @@ overrides:
   env.alpha: 0.36
   env.beta: 0.95
   env.delta: 0.025
-  env.max_steps: 5000               # episode length (steps before reset)
-  env.k_init: 1.0
-  env.k_init_dist: constant         # every agent starts at k_init
-  env.k_init_resample: per_episode  # inert under k_init_dist=constant
-  env.k_init_sigma: 0.0
-  env.k_init_low: 3.0               # inert under k_init_dist=constant
-  env.k_init_high: 20.0             # inert under k_init_dist=constant
+  env.max_steps: 200                # episode length = rollout_len: one reset
+                                    # per rollout, as runs/paper-ks-fig34
+  # Starting capital: the reference KS draw, U(10, 70) per agent, redrawn at
+  # every episode reset. Pinned to runs/paper-ks-fig34/config.yaml -- NOT the
+  # k_0 = 1 constant that configs/exp/ks.yaml still carries for the pre-2026-07
+  # runs, and NOT the beta-rescaled U(3, 20) the schema defaults to.
+  env.k_init_dist: uniform
+  env.k_init_low: 10.0
+  env.k_init_high: 70.0
+  env.k_init_resample: per_episode  # new population at every reset
+  env.k_init: 1.0                   # inert under k_init_dist=uniform
+  env.k_init_sigma: 0.0             # inert under k_init_dist=uniform
   env.obs_vars: [capital, labour, mean_capital, aggregate_state, kappa, lambda]
   env.kappas: null                  # null -> ones(n_agents): homogeneous
   env.lambdas: null                 # null -> ones(n_agents): homogeneous
@@ -88,7 +95,7 @@ overrides:
   diag.economic: false
   diag.distributional: false
   diag.n_snapshots: 200             # inert: collect_diagnostics is false
-  diag.sim_steps: 5000              # inert: collect_diagnostics is false
+  diag.sim_steps: 200               # inert: collect_diagnostics is false
   diag.burn_frac: 0.5               # inert: collect_diagnostics is false
   diag.n_agents: null
 
