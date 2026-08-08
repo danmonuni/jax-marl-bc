@@ -5,7 +5,7 @@
 #
 # The two-axis twin of scan_agents_multiseed_gpu.yaml. That sweep widens the
 # population at a single environment; this one sweeps BOTH widths of the batch
-# (n_agents x num_envs) over their full 8 x 8 product, so the figure is a phase
+# (n_agents x num_envs) over their full 9 x 9 product, so the figure is a phase
 # diagram rather than a curve: where the device is still latency-bound, where it
 # saturates, and how the same batch width W = n * E splits between the two axes.
 #
@@ -24,13 +24,23 @@
 # inherit anything from configs/base.yaml or configs/exp/ks.yaml. Only
 # `env.n_agents` / `train.num_envs` (the axes) and `run.seed` (the repeat) vary.
 #
-# Cost: the old single-seed grid took 1h14 of wall time for the 64 cells, and
-# the cells it shares with the agent scan time within ~10% of it, so three seeds
-# is ~3.7 h — one Kaggle GPU session, unlike the agent scan which needs two or
-# three. The largest cell (200 agents x 200 envs) held 40,000 parallel actors
-# and ran in ~12 min; nothing here comes near the memory ceiling that the
-# 200,000-agent cell of the agent scan lives at, so `run.prealloc` is not
-# load-bearing (kept true only to match that sweep's execution settings).
+# Cost: ~12.6 h for the full 81 cells x 3 seeds, so budget TWO Kaggle sessions
+# (`resume: true` carries the second one). The old single-seed grid is a good
+# ruler — a least-squares fit to its 64 cells gives run_time ~ 21 s + 0.0170 s
+# per (n x E) unit, and the cells it shares with the agent scan land within
+# ~10% of it. The 500 rung is what costs: it triples the 8 x 8 grid's ~3.3 h,
+# and the corner cell alone is ~71 min PER SEED.
+#
+# ** MEMORY: the 500 x 500 corner cell does not fit a T4 under `prealloc`. **
+# 250,000 parallel actors forecast ~12.90 GB (buffer 11.20 + update 1.70)
+# against the 11.7 GB of a preallocated 75% T4 pool -- 110%, and the launch
+# banner will say so. Every other cell is <= 5.2 GB (44%): the next-largest
+# products, 500 x 200 and 200 x 500, are only 100,000 actors. Two ways out,
+# both one line: set `run.prealloc: false` here so JAX grows on demand into
+# the ~15 GB the card actually has (it costs the contiguous pool, which
+# nothing else in this sweep needs), or drop 500 from ONE of the two axes and
+# keep the corner unmeasured. Left at prealloc: true so the execution settings
+# still match the agent scan exactly -- change it deliberately, not by default.
 #
 # Draw the figures again from a saved results.csv without retraining:
 #   python -m jmbc.sweep sweep=scan_grid_multiseed_gpu \
@@ -41,14 +51,19 @@ out_dir: runs                 # -> runs/scan_grid_multiseed_GPU/
 base_exp: ks
 
 # ── what varies ───────────────────────────────────────────────────────────
-# 8 x 8 = 64 cells. Both axes carry the SAME 1-2-5 rungs as the agent-scaling
-# sweep's first eight points, which is the one deliberate change from the old
-# grid: it used 40 where this uses 50. Aligning the rungs is what makes the
-# E = 1 column comparable cell-for-cell with scan_agents_multiseed_gpu; the
-# cost is that the constant-product cut below has 6 splits instead of 8.
+# 9 x 9 = 81 cells. Both axes carry the SAME 1-2-5 rungs as the agent-scaling
+# sweep's first NINE points, which is the one deliberate change from the old
+# grid: it used 40 where this uses 50, and it stopped at 200. Aligning the
+# rungs is what makes the E = 1 column comparable cell-for-cell with
+# scan_agents_multiseed_gpu; the cost is that the constant-product cut below
+# has 6 splits instead of 8.
+#
+# The 500 rung is where the grid stops being cheap: it adds 17 of the 81 cells
+# but roughly two thirds of the total wall time, and its corner cell is the one
+# memory risk in the sweep (see the header).
 axes:
-  env.n_agents:   [1, 2, 5, 10, 20, 50, 100, 200]
-  train.num_envs: [1, 2, 5, 10, 20, 50, 100, 200]
+  env.n_agents:   [1, 2, 5, 10, 20, 50, 100, 200, 500]
+  train.num_envs: [1, 2, 5, 10, 20, 50, 100, 200, 500]
 
 # Repeats are seeds, not anonymous reruns: they land in results.csv as a
 # `seed` column and are collapsed to mean/std/sem in results_summary.csv.
@@ -131,7 +146,7 @@ paired: false                       # full Cartesian product: the grid IS the po
 benchmark: false                    # AOT phase timer already isolates run time
 # phase    -> phase_time.png (wall seconds per cell) and phase_throughput.png
 #             (agent-transitions/s = 500 x 200 x E x n / run_s), both over the
-#             8 x 8 mesh, cells = mean over the three seeds.
+#             9 x 9 mesh, cells = mean over the three seeds.
 # tradeoff -> run time along n_agents * num_envs == 200, i.e. the six ways of
 #             splitting the same batch width between population and replicas.
 # The per-axis walltime/transitions CURVES are deliberately NOT requested: with
