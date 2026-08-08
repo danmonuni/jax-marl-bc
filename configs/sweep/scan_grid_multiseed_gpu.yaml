@@ -1,0 +1,142 @@
+# ==========================================================================
+# Agents x environments phase grid on GPU, 3 seeds per cell.
+#
+#   python -m jmbc.sweep sweep=scan_grid_multiseed_gpu
+#
+# The two-axis twin of scan_agents_multiseed_gpu.yaml. That sweep widens the
+# population at a single environment; this one sweeps BOTH widths of the batch
+# (n_agents x num_envs) over their full 8 x 8 product, so the figure is a phase
+# diagram rather than a curve: where the device is still latency-bound, where it
+# saturates, and how the same batch width W = n * E splits between the two axes.
+#
+# It is the re-run of the old runs/scaling_grid (name: scaling-phase, single
+# repeat, `run.device: auto`, and the pre-2026-07 economy inherited implicitly
+# from configs/exp/ks.yaml). EVERY parameter here that is not an axis is copied
+# from scan_agents_multiseed_gpu.yaml, so the two scans are directly
+# comparable: same economy (200-step episodes, k_0 ~ U(10, 70) redrawn per
+# episode), same PPO budget (100,000 sequential steps = 500 updates), same
+# 4,739-parameter network, same seeds [0, 1, 2], same hard-pinned GPU backend.
+# The E = 1 column of this grid is therefore a replication of the first eight
+# points of the agent-scaling curve — an independent check, not a new protocol.
+#
+# This file is SELF-CONTAINED by construction: `overrides` pins every field of
+# the experiment schema that this sweep depends on, so the cells do not silently
+# inherit anything from configs/base.yaml or configs/exp/ks.yaml. Only
+# `env.n_agents` / `train.num_envs` (the axes) and `run.seed` (the repeat) vary.
+#
+# Cost: the old single-seed grid took 1h14 of wall time for the 64 cells, and
+# the cells it shares with the agent scan time within ~10% of it, so three seeds
+# is ~3.7 h — one Kaggle GPU session, unlike the agent scan which needs two or
+# three. The largest cell (200 agents x 200 envs) held 40,000 parallel actors
+# and ran in ~12 min; nothing here comes near the memory ceiling that the
+# 200,000-agent cell of the agent scan lives at, so `run.prealloc` is not
+# load-bearing (kept true only to match that sweep's execution settings).
+#
+# Draw the figures again from a saved results.csv without retraining:
+#   python -m jmbc.sweep sweep=scan_grid_multiseed_gpu \
+#       replot=runs/scan_grid_multiseed_GPU
+# ==========================================================================
+name: scan_grid_multiseed_GPU
+out_dir: runs                 # -> runs/scan_grid_multiseed_GPU/
+base_exp: ks
+
+# ── what varies ───────────────────────────────────────────────────────────
+# 8 x 8 = 64 cells. Both axes carry the SAME 1-2-5 rungs as the agent-scaling
+# sweep's first eight points, which is the one deliberate change from the old
+# grid: it used 40 where this uses 50. Aligning the rungs is what makes the
+# E = 1 column comparable cell-for-cell with scan_agents_multiseed_gpu; the
+# cost is that the constant-product cut below has 6 splits instead of 8.
+axes:
+  env.n_agents:   [1, 2, 5, 10, 20, 50, 100, 200]
+  train.num_envs: [1, 2, 5, 10, 20, 50, 100, 200]
+
+# Repeats are seeds, not anonymous reruns: they land in results.csv as a
+# `seed` column and are collapsed to mean/std/sem in results_summary.csv.
+seeds: [0, 1, 2]
+
+# ── what is held fixed (complete, explicit; identical to
+#    scan_agents_multiseed_gpu.yaml except that num_envs is now an axis) ────
+overrides:
+  # -- economy: Krusell-Smith, homogeneous agents ---------------------------
+  env.kind: ks
+  env.alpha: 0.36
+  env.beta: 0.95
+  env.delta: 0.025
+  env.max_steps: 200                # episode length = rollout_len: one reset
+                                    # per rollout, as runs/paper-ks-fig34
+  # Starting capital: the reference KS draw, U(10, 70) per agent, redrawn at
+  # every episode reset. Pinned to runs/paper-ks-fig34/config.yaml -- NOT the
+  # k_0 = 1 constant that configs/exp/ks.yaml still carries for the pre-2026-07
+  # runs (and that the old scaling_grid therefore ran under), and NOT the
+  # beta-rescaled U(3, 20) the schema defaults to.
+  env.k_init_dist: uniform
+  env.k_init_low: 10.0
+  env.k_init_high: 70.0
+  env.k_init_resample: per_episode  # new population at every reset
+  env.obs_vars: [capital, labour, mean_capital, aggregate_state, kappa, lambda]
+  env.kappas: null                  # null -> ones(n_agents): homogeneous
+  env.lambdas: null                 # null -> ones(n_agents): homogeneous
+
+  # -- PPO: fixed SEQUENTIAL budget per cell, independent of both axes ------
+  # NUM_UPDATES = total_timesteps // rollout_len = 500 for every cell, whatever
+  # num_envs is: the vectorized envs widen each update, they do not shorten the
+  # schedule. So a cell simulates 500 x 200 x num_envs env steps and
+  # 500 x 200 x num_envs x n_agents agent-transitions, while issuing the same
+  # 500 optimizer steps everywhere -- which is exactly what makes the wall-time
+  # surface readable as a cost-of-width surface.
+  train.rollout_len: 200
+  train.total_timesteps: 100000     # 100,000 / 200 = 500 updates per cell
+  train.update_epochs: 4
+  train.num_minibatches: 64
+  train.lr: 3.0e-4
+  train.anneal_lr: true
+  train.gamma: 0.95
+  train.gae_lambda: 0.95
+  train.clip_eps: 0.2
+  train.vf_coef: 0.5
+  train.ent_coef: 0.0
+  train.max_grad_norm: 0.5
+  train.log_every: 100              # heartbeat only; no effect on the XLA graph
+  # train.num_envs is NOT pinned here -- it is the second axis.
+
+  # -- network: same 4,739-parameter actor-critic in every cell -------------
+  net.hidden_dims: [64, 64]
+  net.activation: tanh
+
+  # -- diagnostics: OFF. This is a timing scan; Euler/Gini probes would add
+  #    untimed post-training work and dominate the small cells. ------------
+  diag.economic: false
+  diag.distributional: false
+  diag.n_snapshots: 200             # inert: collect_diagnostics is false
+  diag.sim_steps: 200               # inert: collect_diagnostics is false
+  diag.burn_frac: 0.5               # inert: collect_diagnostics is false
+  diag.n_agents: null
+
+  # -- execution -----------------------------------------------------------
+  run.device: gpu                   # hard-pinned: fails loudly, never silently
+                                    # on CPU (the old grid ran `auto`)
+  run.prealloc: true                # matches the agent scan; not load-bearing
+                                    # at these sizes
+  run.seed: 0                       # superseded per-cell by `seeds` above
+
+# ── output ────────────────────────────────────────────────────────────────
+# results.csv is flushed after EVERY cell, so an interrupted scan keeps what it
+# timed. Re-running with resume=true skips the (cell, seed) triples already in
+# it — the key is (n_agents, num_envs, seed):
+#   python -m jmbc.sweep sweep=scan_grid_multiseed_gpu resume=true
+resume: false                       # set true to continue an interrupted scan
+collect_diagnostics: false          # no per-cell diagnostics in results.csv
+save_cell_runs: false               # timings only, no per-cell run directories
+paired: false                       # full Cartesian product: the grid IS the point
+benchmark: false                    # AOT phase timer already isolates run time
+# phase    -> phase_time.png (wall seconds per cell) and phase_throughput.png
+#             (agent-transitions/s = 500 x 200 x E x n / run_s), both over the
+#             8 x 8 mesh, cells = mean over the three seeds.
+# tradeoff -> run time along n_agents * num_envs == 200, i.e. the six ways of
+#             splitting the same batch width between population and replicas.
+# The per-axis walltime/transitions CURVES are deliberately NOT requested: with
+# two axes they would marginalize over the other one and average unlike cells.
+# Get them per slice from results.csv instead, or from the agent scan.
+figures: [phase, tradeoff]
+reference_csv: null
+tradeoff_product: 200
