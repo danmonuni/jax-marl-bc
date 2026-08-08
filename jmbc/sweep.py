@@ -311,6 +311,13 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
             row["num_envs"] = int(cfg.train.num_envs)
             row["total_timesteps"] = int(cfg.train.total_timesteps)
             row.update(res["timing"])
+            # Agent-transitions/s: the throughput that varies with the axis.
+            # timing's throughput_steps_per_s counts SEQUENTIAL env steps, held
+            # fixed across cells by design; each such step advances n_agents
+            # actors. Recorded, not just derived at plot time.
+            thr = res["timing"].get("throughput_steps_per_s")
+            if thr:
+                row["transitions_per_s"] = thr * int(cfg.env.n_agents)
             row.update(_extract_diag_scalars(res["summary"]))
             rows.append(row)
             t = res["timing"]

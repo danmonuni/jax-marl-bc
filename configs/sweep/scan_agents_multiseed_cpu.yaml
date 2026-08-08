@@ -40,7 +40,7 @@ base_exp: ks
 # also appears in the GPU axis, so the two curves share every x for the
 # speedup ratio.
 axes:
-  env.n_agents: [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000]
+  env.n_agents: [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]
 
 # Repeats are seeds, not anonymous reruns: they land in results.csv as a
 # `seed` column and are collapsed to mean/std/sem in results_summary.csv.
@@ -113,6 +113,9 @@ collect_diagnostics: false          # no per-cell diagnostics in results.csv
 save_cell_runs: false               # timings only, no per-cell run directories
 paired: false                       # single axis; irrelevant here
 benchmark: false                    # AOT phase timer already isolates run time
-figures: [walltime, throughput]     # both get +-1 s.d. whiskers across seeds
+# walltime: seconds per cell. transitions: agent-transitions/s, the throughput
+# that actually scales with n_agents (plain `throughput` is sequential env
+# steps/s, fixed by design here and merely walltime inverted).
+figures: [walltime, transitions, throughput]   # all get +-1 s.d. whiskers
 reference_csv: null
 tradeoff_product: null

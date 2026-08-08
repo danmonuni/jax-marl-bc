@@ -67,8 +67,6 @@ overrides:
   env.k_init_low: 10.0
   env.k_init_high: 70.0
   env.k_init_resample: per_episode  # new population at every reset
-  env.k_init: 1.0                   # inert under k_init_dist=uniform
-  env.k_init_sigma: 0.0             # inert under k_init_dist=uniform
   env.obs_vars: [capital, labour, mean_capital, aggregate_state, kappa, lambda]
   env.kappas: null                  # null -> ones(n_agents): homogeneous
   env.lambdas: null                 # null -> ones(n_agents): homogeneous
@@ -116,6 +114,9 @@ collect_diagnostics: false          # no per-cell diagnostics in results.csv
 save_cell_runs: false               # timings only, no per-cell run directories
 paired: false                       # single axis; irrelevant here
 benchmark: false                    # AOT phase timer already isolates run time
-figures: [walltime, throughput]     # both get +-1 s.d. whiskers across seeds
+# walltime: seconds per cell. transitions: agent-transitions/s, the throughput
+# that actually scales with n_agents (plain `throughput` is sequential env
+# steps/s, fixed by design here and merely walltime inverted).
+figures: [walltime, transitions, throughput]   # all get +-1 s.d. whiskers
 reference_csv: null
 tradeoff_product: null

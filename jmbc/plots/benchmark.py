@@ -34,11 +34,20 @@ def axis_label(col: str) -> str:
 
 
 def ensure_time_column(df):
-    """Add a canonical ``time_s`` column (steady-state run seconds).
+    """Normalize the derived metric columns every figure reads.
 
-    Rows from heterogeneous sources (double-run cells, single timed runs,
-    reference CSVs with ``time_hours``) are normalized so every figure reads
-    one column.
+    ``time_s`` — canonical steady-state run seconds. Rows from heterogeneous
+    sources (double-run cells, single timed runs, reference CSVs with
+    ``time_hours``) are reconciled onto one column.
+
+    ``transitions_per_s`` — agent-transitions per second. THE throughput
+    measure for an agent-scaling sweep, and not the same thing as
+    ``throughput_steps_per_s``: the latter counts *sequential env steps*
+    (NUM_UPDATES x ROLLOUT_LEN x NUM_ENVS), which is held fixed across cells
+    by design, so it is just time_s inverted and says nothing about how much
+    work the device absorbed. Each sequential step advances n_agents actors,
+    hence the n_agents factor. Derived here rather than only at write time so
+    an older results.csv replots correctly.
     """
     df = df.copy()
     if "time_s" not in df.columns:
@@ -48,12 +57,17 @@ def ensure_time_column(df):
     for c in TIME_COLS:
         if c in df.columns:
             df["time_s"] = df["time_s"].fillna(df[c])
+
+    if {"throughput_steps_per_s", "n_agents"} <= set(df.columns):
+        derived = df["throughput_steps_per_s"] * df["n_agents"]
+        df["transitions_per_s"] = (derived if "transitions_per_s" not in df.columns
+                                   else df["transitions_per_s"].fillna(derived))
     return df
 
 
 # Timing/rate columns that get mean/std/sem/min/max in results_summary.csv.
 STAT_COLS = ("time_s", "run_time_s", "wall_time_s", "compile_time_s",
-             "trace_time_s", "throughput_steps_per_s")
+             "trace_time_s", "throughput_steps_per_s", "transitions_per_s")
 # Cell identity carried through aggregation unchanged (constant within a cell).
 ID_COLS = ("base_exp", "device", "n_agents", "num_envs", "total_timesteps",
            "env_steps")
@@ -336,7 +350,9 @@ def make_sweep_figures(df, axes, out_dir: str, figures: List[str],
     which graphs are rendered from the timing table.
 
     Kinds: "auto" (legacy per-axis throughput+walltime), "walltime",
-    "throughput" (one figure per swept axis, one line per method),
+    "throughput" (sequential env steps/s -- fixed by design in a pure
+    agent-scaling sweep, so mostly a sanity check), "transitions"
+    (agent-transitions/s, the throughput that actually scales),
     "speedup" (ours vs each reference method on matching x), "phase"
     (n_agents x num_envs heatmap of absolute time), "tradeoff" (time along
     n_agents * num_envs == tradeoff_product). Unavailable data degrades to a
@@ -370,7 +386,16 @@ def make_sweep_figures(df, axes, out_dir: str, figures: List[str],
             for col in axis_cols:
                 p = str(out / f"throughput_vs_{col}.png")
                 plot_metric_vs(df, col, "throughput_steps_per_s", p, group_col,
-                               ylabel="Transitions / s",
+                               ylabel="Sequential env steps / s",
+                               title=f"Sequential throughput vs {col}")
+                paths.append(p)
+        elif kind == "transitions":
+            if "transitions_per_s" not in df.columns:
+                _skip(kind, "needs throughput_steps_per_s and n_agents"); continue
+            for col in axis_cols:
+                p = str(out / f"transitions_vs_{col}.png")
+                plot_metric_vs(df, col, "transitions_per_s", p, group_col,
+                               ylabel="Agent-transitions / s",
                                title=f"Throughput vs {col}")
                 paths.append(p)
         elif kind == "speedup":
@@ -387,16 +412,10 @@ def make_sweep_figures(df, axes, out_dir: str, figures: List[str],
             else:
                 _skip(kind, "needs >=2 values on both n_agents and num_envs")
                 continue
-            if "throughput_steps_per_s" in df.columns:
-                # Total transition rate: sequential steps x num_envs x
-                # n_agents per second (throughput_steps_per_s already
-                # includes num_envs).
-                d2 = df.copy()
-                d2["transitions_per_s"] = (
-                    d2["throughput_steps_per_s"] * d2["n_agents"])
+            if "transitions_per_s" in df.columns:
                 p = str(out / "phase_throughput.png")
                 if plot_phase_diagram(
-                        d2, p, value="transitions_per_s",
+                        df, p, value="transitions_per_s",
                         cbar_label="Agent-transitions / s",
                         title="Total throughput (agent-transitions/s)"):
                     paths.append(p)

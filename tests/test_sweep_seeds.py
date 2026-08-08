@@ -10,7 +10,7 @@ import pytest
 from omegaconf import OmegaConf
 
 from jmbc.config.schema import SweepConfig
-from jmbc.plots import summarize_repeats
+from jmbc.plots import ensure_time_column, summarize_repeats
 from jmbc.sweep import _cell_key, load_done, resolve_seeds
 
 
@@ -81,6 +81,39 @@ def test_identity_columns_survive_aggregation():
     s = summarize_repeats(_table({10: [10.0, 12.0]}), ["n_agents"])
     assert s["device"].iloc[0] == "gpu"
     assert int(s["num_envs"].iloc[0]) == 1
+
+
+# ── throughput: sequential steps vs agent-transitions ─────────────────────
+
+def test_transitions_per_s_scales_with_n_agents():
+    """throughput_steps_per_s counts SEQUENTIAL env steps and is held fixed
+    across cells by design; the throughput that varies is agent-transitions/s.
+    Conflating them makes the throughput figure a mirror of the walltime one."""
+    df = ensure_time_column(_table({10: [10.0], 1000: [100.0]}))
+    row = df.set_index("n_agents")
+    # same sequential budget (100k steps) at both sizes
+    assert row.loc[10, "throughput_steps_per_s"] == pytest.approx(10_000.0)
+    assert row.loc[1000, "throughput_steps_per_s"] == pytest.approx(1_000.0)
+    # ...but 100x the actors, so 10x the transitions despite the slower run
+    assert row.loc[10, "transitions_per_s"] == pytest.approx(100_000.0)
+    assert row.loc[1000, "transitions_per_s"] == pytest.approx(1_000_000.0)
+
+
+def test_transitions_derived_for_a_results_csv_that_predates_the_column():
+    """Replotting an already-finished sweep must produce the column, not skip
+    the figure -- the runs are expensive and cannot be redone for a rename."""
+    df = _table({10: [10.0, 12.0]})
+    assert "transitions_per_s" not in df.columns
+    s = summarize_repeats(df, ["n_agents"])
+    assert "transitions_per_s_mean" in s.columns
+    assert s["transitions_per_s_mean"].iloc[0] == pytest.approx(
+        10 * (100000 / 10.0 + 100000 / 12.0) / 2)
+
+
+def test_recorded_transitions_are_not_overwritten_by_the_derivation():
+    df = _table({10: [10.0]})
+    df["transitions_per_s"] = 12345.0          # as written by the runner
+    assert ensure_time_column(df)["transitions_per_s"].iloc[0] == 12345.0
 
 
 # ── resume ────────────────────────────────────────────────────────────────
