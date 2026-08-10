@@ -360,14 +360,12 @@ def plot_fig4(d: dict, window: int, path: Path, mode: str = "timeavg") -> None:
     x_edges = np.concatenate([[2 * steps[0] - mids[0]], mids,
                               [2 * steps[-1] - mids[-1]]])
 
-    # Empty bins are masked by LogNorm and would otherwise punch the axes
-    # background through the field -- white speckle inside the distribution
-    # where a single agent-step is missing, and a ragged white margin around
-    # it. Painting them (and anything under vmin) with the colormap's own
-    # floor makes "no density" the natural continuation of "almost none", so
-    # the panel reads as one field.
-    cmap = mpl.colormaps["magma"].with_extremes(bad=mpl.colormaps["magma"](0.0),
-                                                under=mpl.colormaps["magma"](0.0))
+    # Empty bins (masked by LogNorm) and anything under vmin read as white --
+    # "no agent was ever here" stays visually distinct from the colormap's
+    # floor, which means "here, but rare". The cost is the speckle wherever a
+    # single agent-step is missing; that is the honest picture of a 200-agent
+    # cross-section and it keeps the panel on the page's own ground.
+    cmap = mpl.colormaps["magma"].with_extremes(bad="white", under="white")
     # Four decades below the peak. The raw minimum positive density is one
     # sample in one bin, which on the pooled convention (n = 10,000) sits so
     # far down that the colour range is spent on bins holding a single
@@ -376,7 +374,7 @@ def plot_fig4(d: dict, window: int, path: Path, mode: str = "timeavg") -> None:
     floor = max(top / 1e4, 1e-9)
 
     fig, ax = plt.subplots(figsize=(9, 5))
-    ax.set_facecolor(cmap(0.0))
+    ax.set_facecolor("white")
     mesh = ax.pcolormesh(x_edges, bins, dens, cmap=cmap,
                          norm=mcolors.LogNorm(vmin=floor, vmax=top))
     ax.plot(steps, ks.mean(axis=1), color="cyan", marker="o", markersize=3.5,
@@ -387,10 +385,9 @@ def plot_fig4(d: dict, window: int, path: Path, mode: str = "timeavg") -> None:
     ax.set_ylabel(spec["label4"].format(w=window), fontsize=14)
     ax.set_title("Stationary capital distribution through training", fontsize=16)
     # The mean line runs through the middle of the field, so the legend sits
-    # in the upper left over the sparse tail; on the now-dark background it
-    # needs an opaque plate rather than the 0.7 wash it had over white.
+    # in the upper left over the sparse tail.
     ax.legend(loc="upper left", fontsize=14, markerfirst=False, frameon=True,
-              facecolor="white", edgecolor="0.3", framealpha=0.92,
+              facecolor="white", edgecolor="0.8", framealpha=0.9,
               borderpad=0.5, handlelength=1.8)
     ax.grid(False)
     ax.tick_params(labelsize=11)
