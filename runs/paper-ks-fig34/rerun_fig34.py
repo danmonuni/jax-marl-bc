@@ -9,7 +9,7 @@ updates and every step of every one of those rollouts is persisted.
 Why a separate experiment rather than a replot of the sweep's output: the
 sweep saves one rollout per cell, the trained policy's. Figures 3 and 4 are
 about how the economy CHANGES over training (untrained vs trained law of
-motion, wealth distribution through training), so they need the snapshots the
+motion, capital distribution through training), so they need the snapshots the
 sweep never recorded. Everything else -- economy, hyperparameters, kappa
 construction, capital initialization -- is the sweep cell's, declared
 explicitly in ``config.yaml`` and re-asserted by ``verify_protocol()`` before
@@ -83,12 +83,20 @@ PROTOCOL: Dict[str, Any] = {
     "net": {
         "activation":      "tanh",
     },
+    "diag": {
+        # Eval population = training population. base_exp used to be
+        # ``ks_n200``, which set this; that file was deleted in 4536381
+        # ("Keep only structural configs") and ``ks``, the config it
+        # extended, leaves the default in place -- so it is pinned here,
+        # where verify_protocol() will check it, rather than inherited.
+        "n_agents":        200,
+    },
 }
 
 
 @dataclass
 class RunConfig:
-    base_exp: str = "ks_n200"      # supplies only what `protocol` does not pin
+    base_exp: str = "ks"           # supplies only what `protocol` does not pin
     protocol: Dict[str, Any] = field(default_factory=lambda: dict(PROTOCOL))
     # The cell. sigma is the kappa log-dispersion of the sweep, NOT env.sigma
     # (which is the RBC TFP innovation and inert in KS); sigma = 0 is the

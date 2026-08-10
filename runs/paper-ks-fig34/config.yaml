@@ -2,8 +2,10 @@
 # file (e.g. `python rerun_fig34.py device=cpu n_snapshots=4`), or point at a
 # different file entirely via `config=<path>`.
 
-base_exp: ks_n200   # supplies only what `protocol` below does not pin
-                    # (obs_vars, net.hidden_dims, log.*, ...)
+base_exp: ks   # supplies only what `protocol` below does not pin
+               # (obs_vars, net.hidden_dims, log.*, ...). Was `ks_n200`, which
+               # 4536381 deleted; it only extended `ks`, and everything it
+               # added is pinned by `protocol` below.
 
 # ── The single run, spelled out ──────────────────────────────────────────────
 # These are the resolved values of the lognormal-kappa sweep behind figure 6
