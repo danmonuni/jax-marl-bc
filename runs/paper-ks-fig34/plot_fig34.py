@@ -12,8 +12,8 @@ figures:
 
   * **Cross-sectional histograms are time-averaged over the last WINDOW=50
     steps** of the evaluation instead of pooling every agent-step of the
-    stationary half. A point is now one agent -- its mean capital (fig. 3) or
-    wealth (fig. 4) over the last 50 simulated periods -- so the distribution
+    stationary half. A point is now one agent -- its mean capital over the
+    last 50 simulated periods -- so the distribution
     is the cross-section of a settled economy rather than the cross-section
     convolved with each agent's own time variation. This is figure 6's
     ``steady_state_capital`` convention, narrowed to a window.
@@ -90,7 +90,6 @@ LABELS = {
     "a_i":    "Wealth, $a^i$",
     "c_i":    "Consumption fraction, $\\hat{c}^i$",
     "steps":  "Training env steps (millions)",
-    "wealth": "Wealth, cash-on-hand",
     "density": "Density",
 }
 
@@ -119,13 +118,13 @@ MODES = {
         "label3": LABELS["k_i"] + " (mean of the last {w} steps)",
         # Figure 4's y label stays the bare quantity: the axis is tall and
         # rotated, and how the window was reduced belongs in the caption.
-        "label4": LABELS["wealth"],
+        "label4": LABELS["k_i"],
     },
     "pooled": {
         "slug":   "pooled",
         "bins3":  40, "bins4": 60,
         "label3": LABELS["k_i"],
-        "label4": LABELS["wealth"],
+        "label4": LABELS["k_i"],
     },
 }
 
@@ -184,16 +183,14 @@ def load_record(path: Path, window: int, panels: int = 4) -> dict:
             np.logspace(0, np.log10(S), panels)).astype(int).clip(1, S) - 1)
 
         done_win = z["done"][:, -window:]             # [S, w]
-        ks_win, w_win = z["ks"][:, -window:], z["wealths"][:, -window:]
+        ks_win = z["ks"][:, -window:]
         out = {
             "env_steps": env_steps, "sel": sel, "n_snapshots": S, "n_steps": T,
             "K": K, "agg_state": agg,
             # timeavg: per-agent mean over the window, per snapshot [S, n]
             "k_timeavg": _window_mean(ks_win, done_win),
-            "w_timeavg": _window_mean(w_win, done_win),
             # pooled: every agent-step in the window, per snapshot [S, w*n]
             "k_pooled": _window_pool(ks_win, done_win),
-            "w_pooled": _window_pool(w_win, done_win),
         }
         # Untrained (first) and trained (last) snapshots, in full, for the
         # consumption-policy scatters.
@@ -336,23 +333,24 @@ def plot_fig3(d: dict, window: int, path: Path, mode: str = "timeavg") -> None:
 
 # ── figure 4 ──────────────────────────────────────────────────────────────────
 def plot_fig4(d: dict, window: int, path: Path, mode: str = "timeavg") -> None:
-    """x = training env steps, y = wealth, colour = the cross-sectional
+    """x = training env steps, y = capital, colour = the cross-sectional
     density over the last `window` steps (``mode``: see MODES)."""
     import matplotlib as mpl
     import matplotlib.pyplot as plt
     from matplotlib import colors as mcolors
+    from matplotlib.ticker import LogLocator
     mpl.rcParams.update(RC)
 
     spec = MODES[mode]
-    ws = d[f"w_{mode}"]                               # [S, samples]
+    ks = d[f"k_{mode}"]                               # [S, samples]
     # In millions, so the axis carries its own unit instead of matplotlib
     # parking a bare "1e6" offset in the corner.
     steps = d["env_steps"] / 1e6
-    lo, hi = np.percentile(ws, 0.5), np.percentile(ws, 99.5)
+    lo, hi = np.percentile(ks, 0.5), np.percentile(ks, 99.5)
     if hi <= lo:
         hi = lo + 1e-6
     bins = np.linspace(lo, hi, spec["bins4"] + 1)
-    dens = np.stack([np.histogram(w, bins=bins, density=True)[0] for w in ws],
+    dens = np.stack([np.histogram(k, bins=bins, density=True)[0] for k in ks],
                     axis=1)                            # [n_bins, S]
 
     # Column edges: midway between consecutive snapshots, the end ones
@@ -362,23 +360,50 @@ def plot_fig4(d: dict, window: int, path: Path, mode: str = "timeavg") -> None:
     x_edges = np.concatenate([[2 * steps[0] - mids[0]], mids,
                               [2 * steps[-1] - mids[-1]]])
 
+    # Empty bins are masked by LogNorm and would otherwise punch the axes
+    # background through the field -- white speckle inside the distribution
+    # where a single agent-step is missing, and a ragged white margin around
+    # it. Painting them (and anything under vmin) with the colormap's own
+    # floor makes "no density" the natural continuation of "almost none", so
+    # the panel reads as one field.
+    cmap = mpl.colormaps["magma"].with_extremes(bad=mpl.colormaps["magma"](0.0),
+                                                under=mpl.colormaps["magma"](0.0))
+    # Four decades below the peak. The raw minimum positive density is one
+    # sample in one bin, which on the pooled convention (n = 10,000) sits so
+    # far down that the colour range is spent on bins holding a single
+    # agent-step and the populated core flattens into one hue.
+    top = dens.max() + 1e-12
+    floor = max(top / 1e4, 1e-9)
+
     fig, ax = plt.subplots(figsize=(9, 5))
-    floor = max(dens[dens > 0].min() if (dens > 0).any() else 1e-6, 1e-6)
-    mesh = ax.pcolormesh(x_edges, bins, dens, cmap="magma",
-                         norm=mcolors.LogNorm(vmin=floor,
-                                              vmax=dens.max() + 1e-12))
-    ax.plot(steps, ws.mean(axis=1), color="cyan", marker="o", markersize=3.5,
-            lw=3.0, label="Mean wealth")
+    ax.set_facecolor(cmap(0.0))
+    mesh = ax.pcolormesh(x_edges, bins, dens, cmap=cmap,
+                         norm=mcolors.LogNorm(vmin=floor, vmax=top))
+    ax.plot(steps, ks.mean(axis=1), color="cyan", marker="o", markersize=3.5,
+            lw=3.0, label="Mean capital")
     ax.set_xlim(x_edges[0], x_edges[-1])
+    ax.set_ylim(bins[0], bins[-1])
     ax.set_xlabel(LABELS["steps"], fontsize=14)
     ax.set_ylabel(spec["label4"].format(w=window), fontsize=14)
-    ax.set_title("Stationary wealth distribution through training", fontsize=16)
-    legend = ax.legend(loc="upper left", fontsize=14, markerfirst=False, frameon=True, facecolor="white", framealpha=0.7)
+    ax.set_title("Stationary capital distribution through training", fontsize=16)
+    # The mean line runs through the middle of the field, so the legend sits
+    # in the upper left over the sparse tail; on the now-dark background it
+    # needs an opaque plate rather than the 0.7 wash it had over white.
+    ax.legend(loc="upper left", fontsize=14, markerfirst=False, frameon=True,
+              facecolor="white", edgecolor="0.3", framealpha=0.92,
+              borderpad=0.5, handlelength=1.8)
     ax.grid(False)
     ax.tick_params(labelsize=11)
-    cbar = fig.colorbar(mesh, ax=ax)
+    # One tick per decade, minors unlabelled: matplotlib's default log
+    # colorbar locator was labelling every decade AND leaving the minors as
+    # unlabelled stubs of the same length, which read as a second scale.
+    cbar = fig.colorbar(mesh, ax=ax, extend="min", pad=0.02, aspect=28)
+    cbar.ax.yaxis.set_major_locator(LogLocator(base=10.0))
+    cbar.ax.yaxis.set_minor_locator(LogLocator(base=10.0, subs=tuple(np.arange(2, 10) * 0.1)))
+    cbar.ax.tick_params(which="minor", length=2)
     cbar.set_label("Density (logarithmic scale)", size=12)
     cbar.ax.tick_params(labelsize=11)
+    cbar.outline.set_visible(False)
     fig.tight_layout()
     fig.savefig(path, bbox_inches="tight")
     plt.close(fig)

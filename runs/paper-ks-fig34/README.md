@@ -20,7 +20,7 @@ committed; regenerate the raw arrays with `rerun_fig34.py` if you need
 
 The sweep persists one rollout per cell: the trained policy's. Figures 3 and 4
 are about how the economy *changes over training* — untrained vs trained law
-of motion, wealth distribution across training snapshots — which no saved
+of motion, capital distribution across training snapshots — which no saved
 artefact of that sweep contains. Retraining the cell is the only way to get
 them, so this is a new experiment directory rather than a plotting change.
 
